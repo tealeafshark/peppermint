@@ -1,5 +1,5 @@
 app-title = Peppermint
-app-comment = Fast Winamp-inspired local music player with tabbed drag-and-drop playlists and 10-band EQ
+app-comment = Fast native local music player with tabbed drag-and-drop playlists and 10-band EQ
 app-keywords = music;audio;player;playlist;equalizer;mp3;flac;cosmic;
 about = About
 repository = Repository

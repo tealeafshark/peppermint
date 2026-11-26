@@ -3,7 +3,7 @@ name = "peppermint"
 version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-only"
-description = "A fast, Winamp-inspired local music player for COSMIC with multi-tab drag-and-drop playlists and a 10-band equalizer"
+description = "A fast, native local music player for COSMIC with multi-tab drag-and-drop playlists and a 10-band equalizer"
 repository = "https://github.com/tealeafshark/peppermint"
 
 [dependencies]

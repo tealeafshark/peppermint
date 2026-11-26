@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Peppermint
-Comment=Winamp-inspired local music player with tabbed playlists and 10-band EQ
+Comment=Fast native local music player with tabbed playlists and 10-band EQ
 Type=Application
 Icon=io.github.tealeafshark.Peppermint
 Exec=peppermint %F
