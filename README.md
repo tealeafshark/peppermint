@@ -2,6 +2,8 @@
 
 A fast, Winamp-inspired native local music player for the **COSMIC Desktop**, built in Rust with `libcosmic`.
 
+![Peppermint Music Player on COSMIC Desktop](screenshots/main.png)
+
 ## Features
 
 - **Multi-Tab Playlists:** Always-visible playlist tab strip (`+` new tab, inline rename, close tab, `Ctrl+1..9` to switch tabs without interrupting playback).
