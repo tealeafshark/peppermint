@@ -1,0 +1,53 @@
+# Flathub / COSMIC Store Flatpak manifest for Peppermint
+#
+# Before submitting to Flathub (https://github.com/flathub/flathub -> `new-pr` branch):
+# 1. Generate `cargo-sources.json` using flatpak-builder-tools:
+#      python3 flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
+# 2. Fill in the exact 40-char commit SHA for tag `v0.1.0` below.
+
+id: io.github.tealeafshark.Peppermint
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: peppermint
+
+finish-args:
+  # Wayland-native display + X11 fallback
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  # GPU acceleration for WGPU / Iced rendering
+  - --device=dri
+  # PipeWire / PulseAudio audio playback
+  - --socket=pulseaudio
+  # Read local ~/Music library by default (additional folders use XDG Portal)
+  - --filesystem=xdg-music:ro
+  # Live COSMIC desktop theme, accent color, and frosted-window sync
+  - --filesystem=xdg-config/cosmic:create
+  - --talk-name=com.system76.CosmicSettingsDaemon
+  # Single-instance D-Bus activation
+  - --own-name=io.github.tealeafshark.Peppermint
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/peppermint/cargo
+
+modules:
+  - name: peppermint
+    buildsystem: simple
+    build-commands:
+      - cargo --offline fetch --manifest-path Cargo.toml --verbose
+      - cargo --offline build --release --verbose
+      - install -Dm0755 target/release/peppermint /app/bin/peppermint
+      - install -Dm0644 target/xdgen/app.desktop /app/share/applications/${FLATPAK_ID}.desktop
+      - install -Dm0644 target/xdgen/app.metainfo.xml /app/share/metainfo/${FLATPAK_ID}.metainfo.xml
+      - install -Dm0644 resources/icons/hicolor/scalable/apps/icon.svg /app/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
+    sources:
+      - type: git
+        url: https://github.com/tealeafshark/peppermint.git
+        tag: v0.1.0
+        # commit: <40-char-commit-sha>
+      - cargo-sources.json

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.tealeafshark.Peppermint</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>Peppermint</name>
+  <summary>Winamp-inspired local music player with tabbed playlists and 10-band EQ</summary>
+  <developer id="io.github.tealeafshark">
+    <name>TeaLeafShark</name>
+  </developer>
+  <description>
+    <p>
+      Peppermint is a fast, native COSMIC desktop local music player built with Rust and libcosmic.
+      Designed around a spacious frosted translucent stage and effortless playlist control, it brings
+      the tactile playlist-first feel of classic players to a modern Wayland desktop.
+    </p>
+    <ul>
+      <li>Multi-tab playlists: switch tabs without interrupting playback, rename inline, and import/export M3U8 files.</li>
+      <li>Full drag-and-drop ordering: drag tracks to reorder or drop audio files and folders straight from COSMIC Files.</li>
+      <li>Slide-out 10-band graphic equalizer: real-time pure-Rust biquad DSP with preamp, bypass, presets, and a live response curve.</li>
+      <li>Semi-transparent background visualizers: Aurora Orbit, Kaleidoscope, and Cosmic Nebula floating behind your album art.</li>
+      <li>Collapsible local library browser supporting MP3, FLAC, OGG, Opus, WAV, M4A, AAC, and AIFF.</li>
+    </ul>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Frosted translucent player stage with Aurora visualizer and multi-tab drag-and-drop playlist</caption>
+      <image>https://raw.githubusercontent.com/tealeafshark/peppermint/main/screenshots/main.png</image>
+    </screenshot>
+  </screenshots>
+  <branding>
+    <color type="primary" scheme_preference="light">#a7f3d0</color>
+    <color type="primary" scheme_preference="dark">#065f46</color>
+  </branding>
+  <url type="homepage">https://github.com/tealeafshark/peppermint</url>
+  <url type="bugtracker">https://github.com/tealeafshark/peppermint/issues</url>
+  <url type="vcs-browser">https://github.com/tealeafshark/peppermint</url>
+  <launchable type="desktop-id">io.github.tealeafshark.Peppermint.desktop</launchable>
+  <provides>
+    <id>com.system76.CosmicApplication</id>
+    <binary>peppermint</binary>
+  </provides>
+  <requires>
+    <display_length compare="ge">460</display_length>
+  </requires>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+  <supports>
+    <control>touch</control>
+  </supports>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+    <category>Player</category>
+  </categories>
+  <keywords>
+    <keyword>COSMIC</keyword>
+    <keyword>Music</keyword>
+    <keyword>Equalizer</keyword>
+    <keyword>Playlist</keyword>
+    <keyword>Visualizer</keyword>
+  </keywords>
+  <releases>
+    <release version="0.1.0" date="2026-11-26">
+      <description>
+        <p>Initial release of Peppermint for the COSMIC desktop.</p>
+        <ul>
+          <li>Spacious frosted translucent stage with centered album art and large bottom media controls.</li>
+          <li>Multi-tab drag-and-drop playlists with COSMIC Files drop support and M3U8 import/export.</li>
+          <li>Top-left slide-out 10-band graphic equalizer with 10 presets and live frequency curve.</li>
+          <li>Three semi-transparent FFT background visualizers (Aurora, Kaleidoscope, Nebula).</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

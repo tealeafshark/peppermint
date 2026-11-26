@@ -1,0 +1,7 @@
+/target
+/flatpak/build-dir
+/flatpak/repo
+/flatpak/vendor
+/flatpak/vendor-config.toml
+/flatpak/*.flatpak
+/.flatpak-builder

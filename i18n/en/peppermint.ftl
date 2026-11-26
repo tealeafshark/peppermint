@@ -1,0 +1,14 @@
+app-title = Peppermint
+app-comment = Fast Winamp-inspired local music player with tabbed drag-and-drop playlists and 10-band EQ
+app-keywords = music;audio;player;playlist;equalizer;mp3;flac;cosmic;
+about = About
+repository = Repository
+view = View
+file = File
+add-files = Add Files…
+add-folder = Add Folder…
+import-playlist = Import M3U8…
+export-playlist = Export M3U8…
+library = Library
+equalizer = Equalizer
+new-playlist = New Playlist

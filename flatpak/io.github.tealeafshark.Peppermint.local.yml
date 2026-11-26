@@ -1,0 +1,45 @@
+# Local offline Flatpak manifest for building & installing Peppermint directly from this repo.
+# Run `./flatpak/build-local.sh` to vendor Cargo dependencies and build/install locally.
+
+id: io.github.tealeafshark.Peppermint
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: peppermint
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --socket=pulseaudio
+  - --filesystem=xdg-music:ro
+  - --filesystem=xdg-config/cosmic:create
+  - --talk-name=com.system76.CosmicSettingsDaemon
+  - --own-name=io.github.tealeafshark.Peppermint
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/peppermint/cargo
+
+modules:
+  - name: peppermint
+    buildsystem: simple
+    build-commands:
+      - cargo --offline build --release --config flatpak/vendor-config.toml
+      - install -Dm0755 target/release/peppermint /app/bin/peppermint
+      - install -Dm0644 target/xdgen/app.desktop /app/share/applications/${FLATPAK_ID}.desktop
+      - install -Dm0644 target/xdgen/app.metainfo.xml /app/share/metainfo/${FLATPAK_ID}.metainfo.xml
+      - install -Dm0644 resources/icons/hicolor/scalable/apps/icon.svg /app/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - target
+          - .git
+          - flatpak/build-dir
+          - flatpak/repo
+          - flatpak/*.flatpak

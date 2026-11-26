@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Peppermint
+Comment=Winamp-inspired local music player with tabbed playlists and 10-band EQ
+Type=Application
+Icon=io.github.tealeafshark.Peppermint
+Exec=peppermint %F
+Terminal=false
+StartupNotify=true
+Categories=AudioVideo;Audio;Player;
+Keywords=music;audio;player;playlist;equalizer;visualizer;COSMIC;
+MimeType=audio/mpeg;audio/flac;audio/ogg;audio/wav;audio/mp4;audio/aac;audio/x-opus+ogg;audio/x-mpegurl;
