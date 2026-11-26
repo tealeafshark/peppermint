@@ -3,7 +3,7 @@
 # Before submitting to Flathub (https://github.com/flathub/flathub -> `new-pr` branch):
 # 1. Generate `cargo-sources.json` using flatpak-builder-tools:
 #      python3 flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
-# 2. Fill in the exact 40-char commit SHA for tag `v0.1.0` below.
+# 2. Fill in the exact 40-char commit SHA for tag `v0.2.0` below.
 
 id: io.github.tealeafshark.Peppermint
 runtime: org.freedesktop.Platform
@@ -48,6 +48,6 @@ modules:
     sources:
       - type: git
         url: https://github.com/tealeafshark/peppermint.git
-        tag: v0.1.0
-        commit: 077a3562e796bcee7fe9f5efec004b745b990e20
+        tag: v0.2.0
+        commit: ba7b51519d13fb86fb67ddbc41a7f0352a728689
       - cargo-sources.json
