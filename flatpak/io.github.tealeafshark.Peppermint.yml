@@ -49,5 +49,5 @@ modules:
       - type: git
         url: https://github.com/tealeafshark/peppermint.git
         tag: v0.1.0
-        commit: f9bbdb109aaa5507e75e1dc5cf0fbd0bbba08ce6
+        commit: 077a3562e796bcee7fe9f5efec004b745b990e20
       - cargo-sources.json
