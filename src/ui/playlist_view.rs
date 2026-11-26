@@ -9,7 +9,6 @@ use cosmic::iced::alignment::Horizontal;
 use cosmic::iced::{Alignment, Border, Color, Length, mouse};
 use cosmic::prelude::*;
 use cosmic::widget;
-use std::borrow::Cow;
 
 #[allow(clippy::too_many_arguments)]
 pub fn view<'a>(
@@ -191,12 +190,7 @@ pub fn view<'a>(
         .push(widget::divider::horizontal::light())
         .push(footer);
 
-    // Wayland/COSMIC DnD destination for files & folders dragged from COSMIC Files.
-    widget::dnd_destination(content, vec![Cow::Borrowed("text/uri-list")])
-        .on_enter(|_, _, _| Message::ExternalDndEnter)
-        .on_leave(|| Message::ExternalDndLeave)
-        .on_finish(|_mime, data, _action, _, _| Message::ExternalDndDrop(data))
-        .into()
+    content.into()
 }
 
 #[allow(clippy::too_many_arguments)]

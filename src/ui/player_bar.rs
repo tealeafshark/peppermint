@@ -1,60 +1,56 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-//! Spacious centered Album Art showcase and bottom big clean media controls.
+//! Spacious centered free-floating Album Art showcase and bottom big clean media controls.
 
 use crate::app::Message;
 use crate::library::metadata::{Track, format_duration};
 use crate::library::playlist::RepeatMode;
 use cosmic::iced::alignment::{Horizontal, Vertical};
-use cosmic::iced::{Alignment, Border, Color, Length};
+use cosmic::iced::{Alignment, Color, Length, Shadow, Vector};
 use cosmic::prelude::*;
 use cosmic::widget;
 
 const APP_ICON: &[u8] = include_bytes!("../../resources/icons/hicolor/scalable/apps/icon.svg");
 
-/// Open, spacious center stage showing large centered Album Art and clean track title/artist.
+/// Open, spacious center stage showing free-floating Album Art (with subtle drop shadow)
+/// and clean track title/artist.
 pub fn album_stage<'a>(
     current_track: Option<&'a Track>,
     artwork: Option<&'a widget::image::Handle>,
     status_error: Option<&'a str>,
 ) -> Element<'a, Message> {
-    let art_size = 270.0;
-
-    let art_inner: Element<'a, Message> = if let Some(handle) = artwork {
-        widget::image(handle.clone())
-            .width(Length::Fixed(art_size))
-            .height(Length::Fixed(art_size))
-            .into()
+    let art_element: Element<'a, Message> = if let Some(handle) = artwork {
+        let art_size = 270.0;
+        widget::container(
+            widget::image(handle.clone())
+                .width(Length::Fixed(art_size))
+                .height(Length::Fixed(art_size)),
+        )
+        .class(cosmic::theme::Container::custom(|_| widget::container::Style {
+            background: None,
+            shadow: Shadow {
+                color: Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 0.42,
+                },
+                offset: Vector::new(0.0, 10.0),
+                blur_radius: 26.0,
+            },
+            ..Default::default()
+        }))
+        .into()
     } else {
         widget::container(
             widget::icon::from_svg_bytes(APP_ICON)
                 .symbolic(false)
                 .icon()
-                .size(112),
+                .size(144),
         )
-        .width(Length::Fixed(art_size))
-        .height(Length::Fixed(art_size))
-        .align_x(Horizontal::Center)
-        .align_y(Vertical::Center)
+        .padding([18, 0, 12, 0])
         .into()
     };
-
-    let art_frame = widget::container(art_inner)
-        .padding(8)
-        .class(cosmic::theme::Container::custom(|theme| {
-            let cosmic = theme.cosmic();
-            let card: Color = cosmic.primary_container_color().into();
-            let on_bg: Color = cosmic.on_bg_color().into();
-            widget::container::Style {
-                background: Some(Color { a: 0.65, ..card }.into()),
-                border: Border {
-                    color: Color { a: 0.16, ..on_bg },
-                    width: 1.0,
-                    radius: 20.0.into(),
-                },
-                ..Default::default()
-            }
-        }));
 
     let (title_text, subtitle_text, badge_text) = match current_track {
         Some(track) => {
@@ -73,17 +69,14 @@ pub fn album_stage<'a>(
     };
 
     let mut stack_col = widget::column::with_capacity(4)
-        .push(art_frame)
-        .push(
-            widget::text::title3(title_text)
-                .align_x(Horizontal::Center),
-        )
+        .push(art_element)
+        .push(widget::text::title3(title_text).align_x(Horizontal::Center))
         .push(
             widget::text::body(subtitle_text)
                 .size(14.0)
                 .align_x(Horizontal::Center),
         )
-        .spacing(10)
+        .spacing(12)
         .align_x(Alignment::Center)
         .padding([24, 32]);
 

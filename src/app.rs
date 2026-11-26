@@ -17,6 +17,7 @@ use cosmic::Application;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::dialog::file_chooser;
+use cosmic::iced::clipboard::dnd::DndAction;
 use cosmic::iced::widget::Stack;
 use cosmic::iced::{Color, Event, Length, Subscription, event, futures, keyboard, mouse, window};
 use cosmic::prelude::*;
@@ -24,6 +25,7 @@ use cosmic::widget::{self, about::About, menu};
 use futures::SinkExt;
 use rand::Rng;
 use rand::seq::SliceRandom;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -140,6 +142,7 @@ pub enum Message {
     ExternalDndEnter,
     ExternalDndLeave,
     ExternalDndDrop(Vec<u8>),
+    ExternalFileTransfer(String),
     WindowFilesDropped(Vec<PathBuf>),
 
     // File dialogs
@@ -493,13 +496,26 @@ impl cosmic::Application for PeppermintApp {
             }
         }));
 
-        widget::row::with_capacity(3)
+        let layout = widget::row::with_capacity(3)
             .push(left_stage)
             .push(widget::divider::vertical::default())
             .push(right_panel)
             .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+            .height(Length::Fill);
+
+        // Stable DnD ID across animated frames so Wayland & Flatpak portal drops always match.
+        widget::dnd_destination::DndDestination::with_id(
+            layout,
+            widget::Id::new("peppermint-drop-target"),
+            vec![Cow::Borrowed("text/uri-list")],
+        )
+        .drag_id(1)
+        .preferred_action(DndAction::Copy)
+        .on_enter(|_, _, _| Message::ExternalDndEnter)
+        .on_leave(|| Message::ExternalDndLeave)
+        .on_file_transfer(Message::ExternalFileTransfer)
+        .on_finish(|_mime, data, _action, _, _| Message::ExternalDndDrop(data))
+        .into()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
@@ -981,6 +997,28 @@ impl cosmic::Application for PeppermintApp {
                         },
                     );
                 }
+            }
+            Message::ExternalFileTransfer(key) => {
+                self.external_dnd_hover = false;
+                let tab_id = self.active_tab_id;
+                return cosmic::command::file_transfer_receive(key).then(move |res| match res {
+                    Ok(files) if !files.is_empty() => {
+                        let paths: Vec<PathBuf> = files.into_iter().map(PathBuf::from).collect();
+                        Task::perform(
+                            async move {
+                                tokio::task::spawn_blocking(move || {
+                                    collect_tracks_from_paths(&paths)
+                                })
+                                .await
+                                .unwrap_or_default()
+                            },
+                            move |tracks| {
+                                cosmic::Action::App(Message::TracksLoadedForTab { tab_id, tracks })
+                            },
+                        )
+                    }
+                    _ => Task::none(),
+                });
             }
 
             // --- File dialogs via XDG Desktop Portal ---
