@@ -143,20 +143,35 @@ pub fn controls_bar<'a>(
         .on_press(Message::ToggleShuffle)
         .tooltip(if shuffle { "Shuffle: On" } else { "Shuffle: Off" });
 
-    let repeat_icon = match repeat {
-        RepeatMode::One => "media-playlist-repeat-song-symbolic",
-        RepeatMode::All | RepeatMode::Off => "media-playlist-repeat-symbolic",
+    let repeat_btn: Element<'a, Message> = if repeat == RepeatMode::One {
+        widget::tooltip(
+            widget::button::custom(
+                widget::row::with_capacity(2)
+                    .push(widget::icon::from_name("media-playlist-repeat-symbolic").size(18))
+                    .push(widget::text::caption_heading("1").size(11.0))
+                    .spacing(2)
+                    .align_y(Alignment::Center),
+            )
+            .padding([6, 8])
+            .class(cosmic::theme::Button::Suggested)
+            .on_press(Message::CycleRepeat),
+            widget::text::caption(repeat.label()),
+            widget::tooltip::Position::Top,
+        )
+        .into()
+    } else {
+        widget::button::icon(widget::icon::from_name("media-playlist-repeat-symbolic"))
+            .icon_size(18)
+            .padding(8)
+            .class(if repeat != RepeatMode::Off {
+                cosmic::theme::Button::Suggested
+            } else {
+                cosmic::theme::Button::Icon
+            })
+            .on_press(Message::CycleRepeat)
+            .tooltip(repeat.label())
+            .into()
     };
-    let repeat_btn = widget::button::icon(widget::icon::from_name(repeat_icon))
-        .icon_size(18)
-        .padding(8)
-        .class(if repeat != RepeatMode::Off {
-            cosmic::theme::Button::Suggested
-        } else {
-            cosmic::theme::Button::Icon
-        })
-        .on_press(Message::CycleRepeat)
-        .tooltip(repeat.label());
 
     let left_group = widget::row::with_capacity(2)
         .push(shuffle_btn)

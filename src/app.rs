@@ -7,21 +7,27 @@ use crate::audio::eq::{EqPreset, EqSettings};
 use crate::audio::visualizer::{VizFrameState, VizMode};
 use crate::config::Config;
 use crate::fl;
-use crate::library::metadata::{Track, read_embedded_artwork};
+use crate::library::lyrics::{ParsedLyrics, load_lyrics_for_track};
+use crate::library::metadata::{
+    Track, TrackTagData, read_embedded_artwork, read_full_track_tags, write_track_tags,
+};
 use crate::library::playlist::{
     AppPersistence, PlaylistTab, RepeatMode, export_m3u8, import_m3u, load_state, save_state,
 };
 use crate::library::scanner::{collect_tracks_from_paths, scan_library_folders};
 use crate::ui;
+use crate::ui::tag_editor::TagEditorState;
 use cosmic::Application;
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::dialog::file_chooser;
 use cosmic::iced::clipboard::dnd::DndAction;
 use cosmic::iced::widget::Stack;
-use cosmic::iced::{Color, Event, Length, Subscription, event, futures, keyboard, mouse, window};
+use cosmic::iced::{
+    Color, Event, Length, Size, Subscription, event, futures, keyboard, mouse, window,
+};
 use cosmic::prelude::*;
-use cosmic::widget::{self, about::About, menu};
+use cosmic::widget::{self, about::About, menu, text_editor};
 use futures::SinkExt;
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -65,8 +71,11 @@ pub enum MenuAction {
     ImportM3u,
     ExportM3u,
     NewTab,
+    TrackInfo,
     ToggleLibrary,
     ToggleEq,
+    OpenLyricsWindow,
+    ToggleStageLyrics,
     About,
 }
 
@@ -80,9 +89,37 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::ImportM3u => Message::OpenImportM3uDialog,
             MenuAction::ExportM3u => Message::OpenExportM3uDialog,
             MenuAction::NewTab => Message::CreateTab,
+            MenuAction::TrackInfo => Message::OpenTagEditorForSelection,
             MenuAction::ToggleLibrary => Message::ToggleLibraryPanel,
             MenuAction::ToggleEq => Message::ToggleEqPanel,
+            MenuAction::OpenLyricsWindow => Message::OpenLyricsWindow,
+            MenuAction::ToggleStageLyrics => Message::ToggleStageLyrics,
             MenuAction::About => Message::ToggleContextPage(ContextPage::About),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TrackContextAction {
+    PlayNow(u64, usize),
+    EditInfo(u64, usize),
+    ViewLyrics(u64, usize),
+    Remove(u64, usize),
+}
+
+impl menu::action::MenuAction for TrackContextAction {
+    type Message = Message;
+
+    fn message(&self) -> Self::Message {
+        match *self {
+            TrackContextAction::PlayNow(tab_id, index) => Message::PlayTrack { tab_id, index },
+            TrackContextAction::EditInfo(tab_id, index) => {
+                Message::OpenTagEditorForTrack { tab_id, index }
+            }
+            TrackContextAction::ViewLyrics(tab_id, index) => {
+                Message::OpenLyricsForTrack { tab_id, index }
+            }
+            TrackContextAction::Remove(tab_id, index) => Message::RemoveTrack { tab_id, index },
         }
     }
 }
@@ -97,6 +134,7 @@ pub enum Message {
     PrevTrack,
     SeekChanged(f64),
     SeekReleased,
+    SeekToMs(u64),
     SetVolume(f32),
     ToggleMute,
     ToggleShuffle,
@@ -111,9 +149,17 @@ pub enum Message {
     EqSelectPreset(usize),
     EqReset,
 
-    // Background visualizer
+    // Background visualizer & hover marquee
     CycleVizMode,
     VizTick,
+    MarqueeTick,
+
+    // Resizable playlist sidebar
+    MainWindowResized(window::Id, f32),
+    StartResizePlaylist,
+    ResizeHandleHover(bool),
+    ResizePlaylistMoved(window::Id, f32),
+    PointerReleased,
 
     // Multi-tab playlists
     SelectTab(u64),
@@ -132,7 +178,7 @@ pub enum Message {
     PlaylistRowPress(usize),
     PlaylistRowStartDrag(usize),
     PlaylistRowHover(usize),
-    CommitRowDrag,
+    PlaylistRowExit(usize),
     MoveTrackRelative { tab_id: u64, index: usize, delta: isize },
     RemoveTrack { tab_id: u64, index: usize },
     AddTracksToActivePlaylist(Vec<Track>),
@@ -144,6 +190,38 @@ pub enum Message {
     ExternalDndDrop(Vec<u8>),
     ExternalFileTransfer(String),
     WindowFilesDropped(Vec<PathBuf>),
+
+    // Pop-out Tag & File Info Editor
+    OpenTagEditorForSelection,
+    OpenTagEditorForTrack { tab_id: u64, index: usize },
+    OpenTagEditorForPath(PathBuf),
+    TagEditorLoaded(TrackTagData),
+    CloseTagEditor,
+    TagEditorSetTitle(String),
+    TagEditorSetArtist(String),
+    TagEditorSetAlbum(String),
+    TagEditorSetTrackNum(String),
+    TagEditorSetYear(String),
+    TagEditorSetGenre(String),
+    TagEditorLyricsAction(text_editor::Action),
+    TagEditorPickArtwork,
+    TagEditorArtworkLoaded(Vec<u8>),
+    TagEditorRemoveArtwork,
+    TagEditorSave,
+    TagEditorSaved(Result<Track, String>),
+
+    // Lyrics Viewer (separate pop-out window + optional stage overlay)
+    OpenLyricsWindow,
+    OpenLyricsForTrack { tab_id: u64, index: usize },
+    CloseLyricsWindow,
+    ToggleStageLyrics,
+    LyricsLoaded {
+        path: PathBuf,
+        lyrics: Option<ParsedLyrics>,
+    },
+
+    // Sub-window helpers
+    DragSubWindow(window::Id),
 
     // File dialogs
     OpenAddFilesDialog,
@@ -163,7 +241,7 @@ pub enum Message {
     LibraryScanFinished(Vec<Track>),
 
     // Keyboard / App chrome
-    KeyShortcut(keyboard::Key, keyboard::Modifiers),
+    KeyShortcut(window::Id, keyboard::Key, keyboard::Modifiers),
     ToggleContextPage(ContextPage),
     UpdateConfig(Config),
     LaunchUrl(String),
@@ -175,6 +253,7 @@ pub struct PeppermintApp {
     context_page: ContextPage,
     about: About,
     key_binds: HashMap<menu::KeyBind, MenuAction>,
+    track_ctx_binds: HashMap<menu::KeyBind, TrackContextAction>,
     config: Config,
 
     // Audio engine & live playback state
@@ -182,6 +261,7 @@ pub struct PeppermintApp {
     playing: Option<(u64, usize)>,
     current_track: Option<Track>,
     current_artwork: Option<widget::image::Handle>,
+    current_lyrics: Option<ParsedLyrics>,
     is_playing: bool,
     is_paused: bool,
     position_secs: f64,
@@ -206,6 +286,12 @@ pub struct PeppermintApp {
     viz_mode: VizMode,
     viz_state: VizFrameState,
 
+    // Resizable playlist sidebar & window metrics
+    window_width: f32,
+    playlist_width: f32,
+    resizing_playlist: bool,
+    resize_handle_hovered: bool,
+
     // Multi-tab playlists
     tabs: Vec<PlaylistTab>,
     active_tab_id: u64,
@@ -213,8 +299,18 @@ pub struct PeppermintApp {
     renaming_tab: Option<(u64, String)>,
     playlist_filter: String,
     selected_row: Option<usize>,
+    hovered_row: Option<usize>,
+    hover_scroll_secs: f32,
     drag_state: Option<DragState>,
     external_dnd_hover: bool,
+
+    // Pop-out Tag Editor & Lyrics Viewer
+    tag_editor: Option<TagEditorState>,
+    lyrics_window_id: Option<window::Id>,
+    lyrics_preview_track: Option<Track>,
+    lyrics_preview_artwork: Option<widget::image::Handle>,
+    lyrics_preview_data: Option<ParsedLyrics>,
+    show_stage_lyrics: bool,
 
     // Local library sidebar
     show_library: bool,
@@ -244,7 +340,7 @@ impl cosmic::Application for PeppermintApp {
         mut core: cosmic::Core,
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
-        // Disable the opaque outer content container so our main stage can be genuinely translucent.
+        // Disable the opaque outer content container so our main stage can be frosted translucent.
         core.window.content_container = false;
 
         let persisted = load_state();
@@ -277,12 +373,14 @@ impl cosmic::Application for PeppermintApp {
             context_page: ContextPage::default(),
             about,
             key_binds: HashMap::new(),
+            track_ctx_binds: HashMap::new(),
             config,
 
             audio,
             playing: None,
             current_track: None,
             current_artwork: None,
+            current_lyrics: None,
             is_playing: false,
             is_paused: false,
             position_secs: 0.0,
@@ -304,14 +402,28 @@ impl cosmic::Application for PeppermintApp {
             viz_mode: persisted.viz_mode,
             viz_state: VizFrameState::default(),
 
+            window_width: 1080.0,
+            playlist_width: persisted.playlist_width.clamp(240.0, 540.0),
+            resizing_playlist: false,
+            resize_handle_hovered: false,
+
             tabs: persisted.tabs,
             active_tab_id: persisted.active_tab_id,
             next_tab_id: persisted.next_tab_id,
             renaming_tab: None,
             playlist_filter: String::new(),
             selected_row: None,
+            hovered_row: None,
+            hover_scroll_secs: 0.0,
             drag_state: None,
             external_dnd_hover: false,
+
+            tag_editor: None,
+            lyrics_window_id: None,
+            lyrics_preview_track: None,
+            lyrics_preview_artwork: None,
+            lyrics_preview_data: None,
+            show_stage_lyrics: persisted.show_stage_lyrics,
 
             show_library: false,
             library_folders: persisted.library_folders,
@@ -348,6 +460,8 @@ impl cosmic::Application for PeppermintApp {
                         menu::Item::Button(fl!("add-files"), None, MenuAction::AddFiles),
                         menu::Item::Button(fl!("add-folder"), None, MenuAction::AddFolder),
                         menu::Item::Divider,
+                        menu::Item::Button(fl!("track-info"), None, MenuAction::TrackInfo),
+                        menu::Item::Divider,
                         menu::Item::Button(fl!("new-playlist"), None, MenuAction::NewTab),
                         menu::Item::Button(fl!("import-playlist"), None, MenuAction::ImportM3u),
                         menu::Item::Button(fl!("export-playlist"), None, MenuAction::ExportM3u),
@@ -361,6 +475,9 @@ impl cosmic::Application for PeppermintApp {
                     vec![
                         menu::Item::Button(fl!("library"), None, MenuAction::ToggleLibrary),
                         menu::Item::Button(fl!("equalizer"), None, MenuAction::ToggleEq),
+                        menu::Item::Divider,
+                        menu::Item::Button(fl!("lyrics-window"), None, MenuAction::OpenLyricsWindow),
+                        menu::Item::Button(fl!("stage-lyrics"), None, MenuAction::ToggleStageLyrics),
                         menu::Item::Divider,
                         menu::Item::Button(fl!("about"), None, MenuAction::About),
                     ],
@@ -384,18 +501,65 @@ impl cosmic::Application for PeppermintApp {
         })
     }
 
+    fn on_close_requested(&self, id: window::Id) -> Option<Self::Message> {
+        if self.tag_editor.as_ref().is_some_and(|e| e.window_id == id) {
+            return Some(Message::CloseTagEditor);
+        }
+        if self.lyrics_window_id == Some(id) {
+            return Some(Message::CloseLyricsWindow);
+        }
+        None
+    }
+
+    fn view_window(&self, id: window::Id) -> Element<'_, Self::Message> {
+        if let Some(ref editor) = self.tag_editor
+            && editor.window_id == id
+        {
+            return ui::tag_editor::view(editor);
+        }
+        if self.lyrics_window_id == Some(id) {
+            let (track, art, lyrics, pos_ms) = if self.lyrics_preview_track.is_some() {
+                (
+                    self.lyrics_preview_track.as_ref(),
+                    self.lyrics_preview_artwork.as_ref(),
+                    self.lyrics_preview_data.as_ref(),
+                    0u64,
+                )
+            } else {
+                (
+                    self.current_track.as_ref(),
+                    self.current_artwork.as_ref(),
+                    self.current_lyrics.as_ref(),
+                    (self.position_secs * 1000.0) as u64,
+                )
+            };
+            return ui::lyrics_view::window_view(id, track, art, lyrics, pos_ms, self.is_playing);
+        }
+        widget::space::horizontal().into()
+    }
+
     fn view(&self) -> Element<'_, Self::Message> {
         let active_tab = self.active_tab();
         let display_pos = self.seeking_preview.unwrap_or(self.position_secs);
+        let playlist_w = self.effective_playlist_width();
 
-        // Centered Album Art showcase over the open translucent canvas
-        let album_stage = ui::player_bar::album_stage(
-            self.current_track.as_ref(),
-            self.current_artwork.as_ref(),
-            self.status_error.as_deref(),
-        );
+        // Center stage: free-floating Album Art, or bold Stage Lyrics when Lyrics is active in the rotation
+        let center_stage: Element<'_, Message> = if self.viz_mode == VizMode::Lyrics {
+            ui::lyrics_view::stage_view(
+                self.current_track.as_ref(),
+                self.current_artwork.as_ref(),
+                self.current_lyrics.as_ref(),
+                (display_pos * 1000.0) as u64,
+            )
+        } else {
+            ui::player_bar::album_stage(
+                self.current_track.as_ref(),
+                self.current_artwork.as_ref(),
+                self.status_error.as_deref(),
+            )
+        };
 
-        // Top-left slide-out 10-band EQ bar (collapsed `>` pull-tab or frosted floating bar)
+        // Top-left slide-out 10-band EQ bar + Lyrics pop-out tab directly beneath it
         let selected_preset = self
             .eq_preset_names
             .iter()
@@ -407,6 +571,7 @@ impl cosmic::Application for PeppermintApp {
             &self.eq,
             &self.eq_preset_names,
             selected_preset,
+            self.lyrics_window_id.is_some(),
         );
 
         let viz_bg = ui::visualizer::background_canvas(self.viz_mode, &self.viz_state);
@@ -415,7 +580,7 @@ impl cosmic::Application for PeppermintApp {
         let transparent_stage = widget::container(
             Stack::new()
                 .push(viz_bg)
-                .push(album_stage)
+                .push(center_stage)
                 .push(viz_pill)
                 .push(eq_overlay)
                 .width(Length::Fill)
@@ -449,7 +614,37 @@ impl cosmic::Application for PeppermintApp {
             .width(Length::Fill)
             .height(Length::Fill);
 
-        // Right full-height Playlist column (with easy multi-tab header + optional Library toggle)
+        // Draggable vertical resize splitter (clamped to 240px .. 50% of window width)
+        let handle_active = self.resizing_playlist || self.resize_handle_hovered;
+        let resize_divider = widget::mouse_area(
+            widget::container(widget::space::horizontal())
+                .width(Length::Fixed(6.0))
+                .height(Length::Fill)
+                .class(cosmic::theme::Container::custom(move |theme| {
+                    let cosmic = theme.cosmic();
+                    let color: Color = if handle_active {
+                        Color {
+                            a: 0.65,
+                            ..Color::from(cosmic.accent_color())
+                        }
+                    } else {
+                        Color {
+                            a: 0.22,
+                            ..Color::from(cosmic.on_bg_color())
+                        }
+                    };
+                    widget::container::Style {
+                        background: Some(color.into()),
+                        ..Default::default()
+                    }
+                })),
+        )
+        .on_press(Message::StartResizePlaylist)
+        .on_enter(Message::ResizeHandleHover(true))
+        .on_exit(Message::ResizeHandleHover(false))
+        .interaction(mouse::Interaction::ResizingHorizontally);
+
+        // Right full-height Playlist column (resizable up to 50% width)
         let tabs_header = ui::playlist_tabs::view(
             &self.tabs,
             self.active_tab_id,
@@ -473,9 +668,13 @@ impl cosmic::Application for PeppermintApp {
                 self.playing,
                 self.is_playing,
                 self.selected_row,
+                self.hovered_row,
+                self.hover_scroll_secs,
+                playlist_w,
                 self.drag_state,
                 self.external_dnd_hover,
                 &self.playlist_filter,
+                &self.track_ctx_binds,
             )
         };
 
@@ -486,7 +685,7 @@ impl cosmic::Application for PeppermintApp {
                 .width(Length::Fill)
                 .height(Length::Fill),
         )
-        .width(Length::Fixed(340.0))
+        .width(Length::Fixed(playlist_w))
         .height(Length::Fill)
         .class(cosmic::theme::Container::custom(|theme| {
             let bg: Color = theme.cosmic().primary_container_color().into();
@@ -498,7 +697,7 @@ impl cosmic::Application for PeppermintApp {
 
         let layout = widget::row::with_capacity(3)
             .push(left_stage)
-            .push(widget::divider::vertical::default())
+            .push(resize_divider)
             .push(right_panel)
             .width(Length::Fill)
             .height(Length::Fill);
@@ -523,10 +722,12 @@ impl cosmic::Application for PeppermintApp {
             self.core()
                 .watch_config::<Config>(Self::APP_ID)
                 .map(|update| Message::UpdateConfig(update.config)),
-            // Global mouse-release (commits playlist drag-and-drop), external file drops, and shortcuts.
-            event::listen_with(|evt, status, _id| match evt {
+            event::listen_with(|evt, status, win_id| match evt {
                 Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                    Some(Message::CommitRowDrag)
+                    Some(Message::PointerReleased)
+                }
+                Event::Window(window::Event::Resized(size)) => {
+                    Some(Message::MainWindowResized(win_id, size.width))
                 }
                 Event::Window(window::Event::FileDropped(paths)) => {
                     Some(Message::WindowFilesDropped(paths))
@@ -534,11 +735,21 @@ impl cosmic::Application for PeppermintApp {
                 Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. })
                     if status == event::Status::Ignored =>
                 {
-                    Some(Message::KeyShortcut(key, modifiers))
+                    Some(Message::KeyShortcut(win_id, key, modifiers))
                 }
                 _ => None,
             }),
         ];
+
+        // Track cursor X only while actively dragging the playlist divider
+        if self.resizing_playlist {
+            subs.push(event::listen_with(|evt, _status, win_id| match evt {
+                Event::Mouse(mouse::Event::CursorMoved { position }) => {
+                    Some(Message::ResizePlaylistMoved(win_id, position.x))
+                }
+                _ => None,
+            }));
+        }
 
         // Lightweight playback telemetry tick while playing or paused
         if self.is_playing || self.is_paused || self.playing.is_some() {
@@ -556,10 +767,9 @@ impl cosmic::Application for PeppermintApp {
             }));
         }
 
-        // Background visualizer animation loop (fast ~45 FPS while playing, calm ~16 FPS when idle)
+        // Background visualizer animation loop (also drives hover title marquee smoothly)
         if self.viz_mode != VizMode::Off {
-            let playing_now = self.is_playing;
-            if playing_now {
+            if self.is_playing {
                 subs.push(Subscription::run(|| {
                     cosmic::iced::stream::channel(
                         2,
@@ -586,17 +796,32 @@ impl cosmic::Application for PeppermintApp {
                     )
                 }));
             }
+        } else if self.hovered_row.is_some() {
+            // Dedicated marquee timer when visualizer is Off and user is hovering a playlist row.
+            subs.push(Subscription::run(|| {
+                cosmic::iced::stream::channel(
+                    2,
+                    |mut emitter: futures::channel::mpsc::Sender<Message>| async move {
+                        let mut interval = tokio::time::interval(Duration::from_millis(90));
+                        loop {
+                            interval.tick().await;
+                            let _ = emitter.send(Message::MarqueeTick).await;
+                        }
+                    },
+                )
+            }));
         }
 
         Subscription::batch(subs)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
             // --- Playback ---
             Message::PlayTrack { tab_id, index } => {
-                self.start_playing(tab_id, index);
-                return self.update_title();
+                let lyrics_task = self.start_playing(tab_id, index);
+                return Task::batch([self.update_title(), lyrics_task]);
             }
             Message::PlayPause => {
                 if self.is_playing {
@@ -612,8 +837,8 @@ impl cosmic::Application for PeppermintApp {
                     let idx = self.selected_row.unwrap_or(0);
                     if !self.active_tab().tracks.is_empty() {
                         let clamped = idx.min(self.active_tab().tracks.len() - 1);
-                        self.start_playing(tab_id, clamped);
-                        return self.update_title();
+                        let lyrics_task = self.start_playing(tab_id, clamped);
+                        return Task::batch([self.update_title(), lyrics_task]);
                     }
                 }
             }
@@ -626,16 +851,16 @@ impl cosmic::Application for PeppermintApp {
                 return self.update_title();
             }
             Message::NextTrack => {
-                self.advance_track(true);
-                return self.update_title();
+                let lyrics_task = self.advance_track(true);
+                return Task::batch([self.update_title(), lyrics_task]);
             }
             Message::PrevTrack => {
                 if self.position_secs > 3.0 {
                     self.audio.seek(Duration::ZERO);
                     self.position_secs = 0.0;
                 } else {
-                    self.previous_track();
-                    return self.update_title();
+                    let lyrics_task = self.previous_track();
+                    return Task::batch([self.update_title(), lyrics_task]);
                 }
             }
             Message::SeekChanged(secs) => {
@@ -647,17 +872,25 @@ impl cosmic::Application for PeppermintApp {
                     self.audio.seek(Duration::from_secs_f64(target.max(0.0)));
                 }
             }
+            Message::SeekToMs(ms) => {
+                let secs = ms as f64 / 1000.0;
+                self.position_secs = secs;
+                self.seeking_preview = None;
+                self.audio.seek(Duration::from_millis(ms));
+            }
             Message::SetVolume(vol) => {
                 self.volume = vol.clamp(0.0, 1.0);
                 if self.volume > 0.001 {
                     self.muted = false;
                 }
-                self.audio.set_volume(if self.muted { 0.0 } else { self.volume });
+                self.audio
+                    .set_volume(if self.muted { 0.0 } else { self.volume });
                 self.persist();
             }
             Message::ToggleMute => {
                 self.muted = !self.muted;
-                self.audio.set_volume(if self.muted { 0.0 } else { self.volume });
+                self.audio
+                    .set_volume(if self.muted { 0.0 } else { self.volume });
                 self.persist();
             }
             Message::ToggleShuffle => {
@@ -682,8 +915,8 @@ impl cosmic::Application for PeppermintApp {
 
                 if snap.finished_generation > self.last_finished_gen {
                     self.last_finished_gen = snap.finished_generation;
-                    self.advance_track(false);
-                    return self.update_title();
+                    let lyrics_task = self.advance_track(false);
+                    return Task::batch([self.update_title(), lyrics_task]);
                 }
             }
 
@@ -729,15 +962,60 @@ impl cosmic::Application for PeppermintApp {
                 self.persist();
             }
 
-            // --- Background visualizer ---
+            // --- Background visualizer & hover marquee ---
             Message::CycleVizMode => {
                 self.viz_mode = self.viz_mode.cycle();
+                self.show_stage_lyrics = self.viz_mode == VizMode::Lyrics;
                 self.persist();
+                if self.viz_mode == VizMode::Lyrics
+                    && self.current_lyrics.is_none()
+                    && let Some(ref cur) = self.current_track
+                {
+                    return spawn_load_lyrics(cur.path.clone());
+                }
             }
             Message::VizTick => {
                 let dt = if self.is_playing { 0.022 } else { 0.060 };
                 self.viz_state
                     .step(self.audio.viz_tap(), self.is_playing, dt);
+                if self.hovered_row.is_some() && self.drag_state.is_none() {
+                    self.hover_scroll_secs += dt;
+                }
+            }
+            Message::MarqueeTick => {
+                if self.hovered_row.is_some() && self.drag_state.is_none() {
+                    self.hover_scroll_secs += 0.090;
+                }
+            }
+
+            // --- Resizable playlist sidebar ---
+            Message::MainWindowResized(win_id, width) => {
+                if self.core.main_window_id().is_none_or(|id| id == win_id) && width > 100.0 {
+                    self.window_width = width;
+                }
+            }
+            Message::StartResizePlaylist => {
+                self.resizing_playlist = true;
+            }
+            Message::ResizeHandleHover(hovered) => {
+                self.resize_handle_hovered = hovered;
+            }
+            Message::ResizePlaylistMoved(win_id, cursor_x) => {
+                if self.resizing_playlist && self.core.main_window_id().is_none_or(|id| id == win_id)
+                {
+                    let desired = self.window_width - cursor_x;
+                    let max_w = (self.window_width * 0.50).max(260.0);
+                    self.playlist_width = desired.clamp(240.0, max_w);
+                }
+            }
+            Message::PointerReleased => {
+                if self.resizing_playlist {
+                    self.resizing_playlist = false;
+                    self.persist();
+                }
+                if let Some(drag) = self.drag_state.take() {
+                    self.reorder_track(drag.tab_id, drag.from_idx, drag.target_idx);
+                }
             }
 
             // --- Multi-tab playlists ---
@@ -746,6 +1024,8 @@ impl cosmic::Application for PeppermintApp {
                     self.active_tab_id = id;
                     self.show_library = false;
                     self.selected_row = None;
+                    self.hovered_row = None;
+                    self.hover_scroll_secs = 0.0;
                     self.drag_state = None;
                     self.renaming_tab = None;
                     self.persist();
@@ -759,6 +1039,7 @@ impl cosmic::Application for PeppermintApp {
                 self.active_tab_id = id;
                 self.show_library = false;
                 self.selected_row = None;
+                self.hovered_row = None;
                 self.drag_state = None;
                 self.persist();
             }
@@ -775,6 +1056,7 @@ impl cosmic::Application for PeppermintApp {
                         let next_pos = pos.min(self.tabs.len() - 1);
                         self.active_tab_id = self.tabs[next_pos].id;
                         self.selected_row = None;
+                        self.hovered_row = None;
                     }
                     self.persist();
                 }
@@ -806,6 +1088,7 @@ impl cosmic::Application for PeppermintApp {
             Message::SetPlaylistFilter(q) => {
                 self.playlist_filter = q;
                 self.drag_state = None;
+                self.hovered_row = None;
             }
             Message::SortActivePlaylist(order) => {
                 let active_id = self.active_tab_id;
@@ -866,6 +1149,7 @@ impl cosmic::Application for PeppermintApp {
                     self.playing = None;
                 }
                 self.selected_row = None;
+                self.hovered_row = None;
                 self.drag_state = None;
                 self.persist();
             }
@@ -877,6 +1161,7 @@ impl cosmic::Application for PeppermintApp {
             Message::PlaylistRowStartDrag(idx) => {
                 if self.playlist_filter.trim().is_empty() {
                     self.selected_row = Some(idx);
+                    self.hovered_row = None;
                     self.drag_state = Some(DragState {
                         tab_id: self.active_tab_id,
                         from_idx: idx,
@@ -889,11 +1174,15 @@ impl cosmic::Application for PeppermintApp {
                     && drag.tab_id == self.active_tab_id
                 {
                     drag.target_idx = idx;
+                } else if self.hovered_row != Some(idx) {
+                    self.hovered_row = Some(idx);
+                    self.hover_scroll_secs = 0.0;
                 }
             }
-            Message::CommitRowDrag => {
-                if let Some(drag) = self.drag_state.take() {
-                    self.reorder_track(drag.tab_id, drag.from_idx, drag.target_idx);
+            Message::PlaylistRowExit(idx) => {
+                if self.hovered_row == Some(idx) {
+                    self.hovered_row = None;
+                    self.hover_scroll_secs = 0.0;
                 }
             }
             Message::MoveTrackRelative {
@@ -927,6 +1216,7 @@ impl cosmic::Application for PeppermintApp {
                             self.selected_row = Some(tab.tracks.len() - 1);
                         }
                     }
+                    self.hovered_row = None;
                     self.persist();
                 }
             }
@@ -950,8 +1240,8 @@ impl cosmic::Application for PeppermintApp {
                 if let Some(idx) = new_idx {
                     self.selected_row = Some(idx);
                     self.persist();
-                    self.start_playing(active_id, idx);
-                    return self.update_title();
+                    let lyrics_task = self.start_playing(active_id, idx);
+                    return Task::batch([self.update_title(), lyrics_task]);
                 }
             }
             Message::AddPathsToActivePlaylist(paths) | Message::WindowFilesDropped(paths) => {
@@ -1021,6 +1311,266 @@ impl cosmic::Application for PeppermintApp {
                 });
             }
 
+            // --- Pop-out Track Info & Tag Editor ---
+            Message::OpenTagEditorForSelection => {
+                let maybe_path = self
+                    .selected_row
+                    .and_then(|idx| self.active_tab().tracks.get(idx))
+                    .or(self.current_track.as_ref())
+                    .map(|t| t.path.clone());
+                if let Some(path) = maybe_path {
+                    return self.update(Message::OpenTagEditorForPath(path));
+                }
+            }
+            Message::OpenTagEditorForTrack { tab_id, index } => {
+                let maybe_path = self
+                    .tabs
+                    .iter()
+                    .find(|t| t.id == tab_id)
+                    .and_then(|t| t.tracks.get(index))
+                    .map(|t| t.path.clone());
+                if let Some(path) = maybe_path {
+                    return self.update(Message::OpenTagEditorForPath(path));
+                }
+            }
+            Message::OpenTagEditorForPath(path) => {
+                return Task::perform(
+                    async move {
+                        tokio::task::spawn_blocking(move || read_full_track_tags(&path))
+                            .await
+                            .expect("tag reader panicked")
+                    },
+                    |data| cosmic::Action::App(Message::TagEditorLoaded(data)),
+                );
+            }
+            Message::TagEditorLoaded(data) => {
+                if let Some(existing) = self.tag_editor.take() {
+                    let win_id = existing.window_id;
+                    self.tag_editor = Some(TagEditorState::new(win_id, data));
+                    return window::gain_focus(win_id);
+                }
+                let settings = window::Settings {
+                    size: Size::new(760.0, 560.0),
+                    min_size: Some(Size::new(620.0, 480.0)),
+                    decorations: false,
+                    transparent: true,
+                    ..Default::default()
+                };
+                let (win_id, open_task) = window::open(settings);
+                self.tag_editor = Some(TagEditorState::new(win_id, data));
+                let title_task =
+                    self.set_window_title("Track Info — Peppermint".to_string(), win_id);
+                return Task::batch([
+                    open_task.discard(),
+                    title_task,
+                    window::enable_blur(win_id),
+                ]);
+            }
+            Message::CloseTagEditor => {
+                if let Some(editor) = self.tag_editor.take() {
+                    return window::close(editor.window_id);
+                }
+            }
+            Message::TagEditorSetTitle(v) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.data.title = v;
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorSetArtist(v) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.data.artist = v;
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorSetAlbum(v) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.data.album = v;
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorSetTrackNum(v) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.data.track_number = v;
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorSetYear(v) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.data.year = v;
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorSetGenre(v) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.data.genre = v;
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorLyricsAction(action) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.lyrics_content.perform(action);
+                    e.data.lyrics = e.lyrics_content.text();
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorPickArtwork => {
+                return Task::perform(
+                    async move {
+                        let dialog = file_chooser::open::Dialog::new()
+                            .title("Choose Album Artwork (PNG / JPEG)");
+                        match dialog.open_file().await {
+                            Ok(response) => {
+                                if let Ok(path) = response.url().to_file_path() {
+                                    std::fs::read(path).ok()
+                                } else {
+                                    None
+                                }
+                            }
+                            Err(_) => None,
+                        }
+                    },
+                    |maybe_bytes| match maybe_bytes {
+                        Some(bytes) => cosmic::Action::App(Message::TagEditorArtworkLoaded(bytes)),
+                        None => cosmic::Action::App(Message::Noop),
+                    },
+                );
+            }
+            Message::TagEditorArtworkLoaded(bytes) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.artwork_handle = Some(widget::image::Handle::from_bytes(bytes.clone()));
+                    e.data.artwork = Some(bytes);
+                    e.data.artwork_modified = true;
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorRemoveArtwork => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.artwork_handle = None;
+                    e.data.artwork = None;
+                    e.data.artwork_modified = true;
+                    e.status_message = None;
+                }
+            }
+            Message::TagEditorSave => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.is_saving = true;
+                    e.data.lyrics = e.lyrics_content.text();
+                    let payload = e.data.clone();
+                    return Task::perform(
+                        async move {
+                            tokio::task::spawn_blocking(move || write_track_tags(&payload))
+                                .await
+                                .unwrap_or_else(|err| Err(format!("Save task failed: {err}")))
+                        },
+                        |res| cosmic::Action::App(Message::TagEditorSaved(res)),
+                    );
+                }
+            }
+            Message::TagEditorSaved(res) => {
+                if let Some(ref mut e) = self.tag_editor {
+                    e.is_saving = false;
+                }
+                match res {
+                    Ok(updated) => {
+                        if let Some(ref mut e) = self.tag_editor {
+                            e.data.artwork_modified = false;
+                            e.status_message = Some(Ok("Saved tags to file!".into()));
+                        }
+                        let lyrics_task = self.refresh_track_metadata(&updated);
+                        self.persist();
+                        return Task::batch([self.update_title(), lyrics_task]);
+                    }
+                    Err(err) => {
+                        if let Some(ref mut e) = self.tag_editor {
+                            e.status_message = Some(Err(err));
+                        }
+                    }
+                }
+            }
+
+            // --- Stylish Lyrics Viewer (Pop-Out Window + Optional Stage Mode) ---
+            Message::OpenLyricsWindow => {
+                // Switch lyrics window back to tracking currently playing song.
+                self.lyrics_preview_track = None;
+                self.lyrics_preview_artwork = None;
+                self.lyrics_preview_data = None;
+                return self.ensure_lyrics_window_open();
+            }
+            Message::OpenLyricsForTrack { tab_id, index } => {
+                let maybe_track = self
+                    .tabs
+                    .iter()
+                    .find(|t| t.id == tab_id)
+                    .and_then(|t| t.tracks.get(index))
+                    .cloned();
+                if let Some(track) = maybe_track {
+                    let is_current = self
+                        .current_track
+                        .as_ref()
+                        .is_some_and(|cur| cur.path == track.path);
+                    let path = track.path.clone();
+                    if is_current {
+                        self.lyrics_preview_track = None;
+                        self.lyrics_preview_artwork = None;
+                        self.lyrics_preview_data = None;
+                    } else {
+                        self.lyrics_preview_artwork =
+                            read_embedded_artwork(&path).map(widget::image::Handle::from_bytes);
+                        self.lyrics_preview_track = Some(track);
+                        self.lyrics_preview_data = None;
+                    }
+                    let open_task = self.ensure_lyrics_window_open();
+                    let load_task = spawn_load_lyrics(path);
+                    return Task::batch([open_task, load_task]);
+                }
+            }
+            Message::CloseLyricsWindow => {
+                self.lyrics_preview_track = None;
+                self.lyrics_preview_artwork = None;
+                self.lyrics_preview_data = None;
+                if let Some(win_id) = self.lyrics_window_id.take() {
+                    return window::close(win_id);
+                }
+            }
+            Message::ToggleStageLyrics => {
+                if self.viz_mode == VizMode::Lyrics {
+                    self.viz_mode = VizMode::AuroraOrbit;
+                    self.show_stage_lyrics = false;
+                } else {
+                    self.viz_mode = VizMode::Lyrics;
+                    self.show_stage_lyrics = true;
+                }
+                self.persist();
+                if self.viz_mode == VizMode::Lyrics
+                    && self.current_lyrics.is_none()
+                    && let Some(ref cur) = self.current_track
+                {
+                    return spawn_load_lyrics(cur.path.clone());
+                }
+            }
+            Message::LyricsLoaded { path, lyrics } => {
+                if self
+                    .current_track
+                    .as_ref()
+                    .is_some_and(|t| t.path == path)
+                {
+                    self.current_lyrics = lyrics.clone();
+                }
+                if self
+                    .lyrics_preview_track
+                    .as_ref()
+                    .is_some_and(|t| t.path == path)
+                {
+                    self.lyrics_preview_data = lyrics;
+                }
+            }
+
+            // --- Sub-window helpers ---
+            Message::DragSubWindow(id) => {
+                return window::drag(id);
+            }
+
             // --- File dialogs via XDG Desktop Portal ---
             Message::OpenAddFilesDialog => {
                 let tab_id = self.active_tab_id;
@@ -1056,11 +1606,8 @@ impl cosmic::Application for PeppermintApp {
                             file_chooser::open::Dialog::new().title("Add Folder to Playlist");
                         match dialog.open_folder().await {
                             Ok(response) => {
-                                let paths: Vec<PathBuf> = response
-                                    .url()
-                                    .to_file_path()
-                                    .into_iter()
-                                    .collect();
+                                let paths: Vec<PathBuf> =
+                                    response.url().to_file_path().into_iter().collect();
                                 tokio::task::spawn_blocking(move || {
                                     collect_tracks_from_paths(&paths)
                                 })
@@ -1110,14 +1657,13 @@ impl cosmic::Application for PeppermintApp {
                             .title("Export Playlist".to_string())
                             .file_name(suggested);
                         match dialog.save_file().await {
-                            Ok(response) => match response
-                                .url()
-                                .and_then(|u| u.to_file_path().ok())
-                            {
-                                Some(path) => export_m3u8(&path, &tab.tracks)
-                                    .map(|()| format!("Saved {}", path.display())),
-                                None => Err("Invalid destination path".into()),
-                            },
+                            Ok(response) => {
+                                match response.url().and_then(|u| u.to_file_path().ok()) {
+                                    Some(path) => export_m3u8(&path, &tab.tracks)
+                                        .map(|()| format!("Saved {}", path.display())),
+                                    None => Err("Invalid destination path".into()),
+                                }
+                            }
                             Err(file_chooser::Error::Cancelled) => Ok(String::new()),
                             Err(err) => Err(format!("Export failed: {err}")),
                         }
@@ -1181,8 +1727,10 @@ impl cosmic::Application for PeppermintApp {
             }
 
             // --- Keyboard shortcuts & chrome ---
-            Message::KeyShortcut(key, modifiers) => {
-                return self.handle_key_shortcut(key, modifiers);
+            Message::KeyShortcut(win_id, key, modifiers) => {
+                if self.core.main_window_id().is_none_or(|id| id == win_id) {
+                    return self.handle_key_shortcut(key, modifiers);
+                }
             }
             Message::ToggleContextPage(page) => {
                 if self.context_page == page {
@@ -1213,6 +1761,11 @@ impl PeppermintApp {
             .unwrap_or(&self.tabs[0])
     }
 
+    fn effective_playlist_width(&self) -> f32 {
+        let max_w = (self.window_width * 0.50).max(260.0);
+        self.playlist_width.clamp(240.0, max_w)
+    }
+
     fn persist(&self) {
         let state = AppPersistence {
             tabs: self.tabs.clone(),
@@ -1227,8 +1780,84 @@ impl PeppermintApp {
             show_library: self.show_library,
             show_eq: self.show_eq,
             viz_mode: self.viz_mode,
+            playlist_width: self.playlist_width,
+            show_stage_lyrics: self.show_stage_lyrics,
         };
         save_state(&state);
+    }
+
+    fn ensure_lyrics_window_open(&mut self) -> Task<cosmic::Action<Message>> {
+        if let Some(win_id) = self.lyrics_window_id {
+            return window::gain_focus(win_id);
+        }
+        let settings = window::Settings {
+            size: Size::new(460.0, 620.0),
+            min_size: Some(Size::new(320.0, 380.0)),
+            decorations: false,
+            transparent: true,
+            ..Default::default()
+        };
+        let (win_id, open_task) = window::open(settings);
+        self.lyrics_window_id = Some(win_id);
+        let title_task = self.set_window_title("Lyrics — Peppermint".to_string(), win_id);
+        let load_task = if self.current_lyrics.is_none()
+            && self.lyrics_preview_track.is_none()
+            && let Some(ref cur) = self.current_track
+        {
+            spawn_load_lyrics(cur.path.clone())
+        } else {
+            Task::none()
+        };
+        Task::batch([
+            open_task.discard(),
+            title_task,
+            window::enable_blur(win_id),
+            load_task,
+        ])
+    }
+
+    /// Updates matching tracks in all playlists, library, and active player after tag save.
+    fn refresh_track_metadata(&mut self, updated: &Track) -> Task<cosmic::Action<Message>> {
+        for tab in &mut self.tabs {
+            for t in &mut tab.tracks {
+                if t.path == updated.path {
+                    let old_id = t.id;
+                    *t = updated.clone();
+                    t.id = old_id;
+                }
+            }
+        }
+        for t in &mut self.library_tracks {
+            if t.path == updated.path {
+                let old_id = t.id;
+                *t = updated.clone();
+                t.id = old_id;
+            }
+        }
+        let mut reload_lyrics = false;
+        if let Some(ref mut cur) = self.current_track
+            && cur.path == updated.path
+        {
+            let old_id = cur.id;
+            *cur = updated.clone();
+            cur.id = old_id;
+            self.current_artwork =
+                read_embedded_artwork(&updated.path).map(widget::image::Handle::from_bytes);
+            reload_lyrics = true;
+        }
+        if let Some(ref mut prev) = self.lyrics_preview_track
+            && prev.path == updated.path
+        {
+            *prev = updated.clone();
+            self.lyrics_preview_artwork =
+                read_embedded_artwork(&updated.path).map(widget::image::Handle::from_bytes);
+            reload_lyrics = true;
+        }
+        if reload_lyrics {
+            spawn_load_lyrics(updated.path.clone())
+        } else {
+            Task::none()
+        }
     }
 
     fn trigger_library_rescan(&mut self) -> Task<cosmic::Action<Message>> {
@@ -1249,7 +1878,7 @@ impl PeppermintApp {
         )
     }
 
-    fn start_playing(&mut self, tab_id: u64, index: usize) {
+    fn start_playing(&mut self, tab_id: u64, index: usize) -> Task<cosmic::Action<Message>> {
         let Some(track) = self
             .tabs
             .iter()
@@ -1257,25 +1886,33 @@ impl PeppermintApp {
             .and_then(|tab| tab.tracks.get(index))
             .cloned()
         else {
-            return;
+            return Task::none();
         };
 
+        let path = track.path.clone();
         self.playing = Some((tab_id, index));
         self.duration_secs = track.duration_secs as f64;
         self.position_secs = 0.0;
         self.seeking_preview = None;
         self.status_error = None;
-        self.current_artwork =
-            read_embedded_artwork(&track.path).map(widget::image::Handle::from_bytes);
-        self.audio.play(track.path.clone(), track.duration_secs);
+        self.current_artwork = read_embedded_artwork(&path).map(widget::image::Handle::from_bytes);
+        self.current_lyrics = None;
+        // Return lyrics window to tracking active playback when a new track starts.
+        self.lyrics_preview_track = None;
+        self.lyrics_preview_artwork = None;
+        self.lyrics_preview_data = None;
+
+        self.audio.play(path.clone(), track.duration_secs);
         self.current_track = Some(track);
         self.is_playing = true;
         self.is_paused = false;
+
+        spawn_load_lyrics(path)
     }
 
-    fn advance_track(&mut self, manual: bool) {
+    fn advance_track(&mut self, manual: bool) -> Task<cosmic::Action<Message>> {
         let Some((tab_id, current_idx)) = self.playing else {
-            return;
+            return Task::none();
         };
         let Some(tab_len) = self
             .tabs
@@ -1283,15 +1920,14 @@ impl PeppermintApp {
             .find(|t| t.id == tab_id)
             .map(|t| t.tracks.len())
         else {
-            return;
+            return Task::none();
         };
         if tab_len == 0 {
-            return;
+            return Task::none();
         }
 
         if !manual && self.repeat == RepeatMode::One {
-            self.start_playing(tab_id, current_idx);
-            return;
+            return self.start_playing(tab_id, current_idx);
         }
 
         let next_idx = if self.shuffle && tab_len > 1 {
@@ -1310,17 +1946,18 @@ impl PeppermintApp {
         };
 
         if let Some(idx) = next_idx {
-            self.start_playing(tab_id, idx);
+            self.start_playing(tab_id, idx)
         } else {
             self.is_playing = false;
             self.is_paused = false;
             self.position_secs = 0.0;
+            Task::none()
         }
     }
 
-    fn previous_track(&mut self) {
+    fn previous_track(&mut self) -> Task<cosmic::Action<Message>> {
         let Some((tab_id, current_idx)) = self.playing else {
-            return;
+            return Task::none();
         };
         let Some(tab_len) = self
             .tabs
@@ -1328,10 +1965,10 @@ impl PeppermintApp {
             .find(|t| t.id == tab_id)
             .map(|t| t.tracks.len())
         else {
-            return;
+            return Task::none();
         };
         if tab_len == 0 {
-            return;
+            return Task::none();
         }
 
         let prev_idx = if current_idx > 0 {
@@ -1339,7 +1976,7 @@ impl PeppermintApp {
         } else {
             tab_len - 1
         };
-        self.start_playing(tab_id, prev_idx);
+        self.start_playing(tab_id, prev_idx)
     }
 
     fn reorder_track(&mut self, tab_id: u64, from_idx: usize, to_idx: usize) {
@@ -1350,7 +1987,6 @@ impl PeppermintApp {
             return;
         }
 
-        // Keep active playback index aligned with the moved track.
         if let Some((pid, pidx)) = self.playing
             && pid == tab_id
         {
@@ -1395,6 +2031,12 @@ impl PeppermintApp {
                 keyboard::Key::Character("l") | keyboard::Key::Character("L") => {
                     return self.update(Message::ToggleLibraryPanel);
                 }
+                keyboard::Key::Character("i") | keyboard::Key::Character("I") => {
+                    return self.update(Message::OpenTagEditorForSelection);
+                }
+                keyboard::Key::Character("y") | keyboard::Key::Character("Y") => {
+                    return self.update(Message::OpenLyricsWindow);
+                }
                 keyboard::Key::Character(ch) if ch.len() == 1 => {
                     if let Some(digit) = ch.chars().next().and_then(|c| c.to_digit(10))
                         && (1..=9).contains(&digit)
@@ -1406,6 +2048,12 @@ impl PeppermintApp {
                 _ => {}
             }
             return Task::none();
+        }
+
+        if modifiers.alt()
+            && matches!(key.as_ref(), keyboard::Key::Character("3"))
+        {
+            return self.update(Message::OpenTagEditorForSelection);
         }
 
         match key.as_ref() {
@@ -1496,6 +2144,19 @@ impl PeppermintApp {
             Task::none()
         }
     }
+}
+
+fn spawn_load_lyrics(path: PathBuf) -> Task<cosmic::Action<Message>> {
+    Task::perform(
+        async move {
+            let p = path.clone();
+            let lyrics = tokio::task::spawn_blocking(move || load_lyrics_for_track(&p))
+                .await
+                .unwrap_or(None);
+            (path, lyrics)
+        },
+        |(path, lyrics)| cosmic::Action::App(Message::LyricsLoaded { path, lyrics }),
+    )
 }
 
 /// Parses a `text/uri-list` payload dropped from COSMIC Files (or any Wayland file manager).

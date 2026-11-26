@@ -12,15 +12,18 @@ use cosmic::prelude::*;
 use cosmic::widget::canvas::{self, Frame, Geometry, Path, Stroke};
 use cosmic::widget::{self, canvas as canvas_widget};
 
-/// Renders the top-left slide-out EQ control:
-/// - When `open == false`, shows a sleek `>` pull-tab tucked at the top-left corner.
-/// - When `open == true`, slides out as a frosted floating EQ bar over the transparent stage.
+/// Renders the top-left slide-out EQ control and the Lyrics pop-out pull-tab tucked right beneath it:
+/// - When `open == false`, shows stacked `> EQ` and `Lyrics` pull-tabs tucked at the top-left edge.
+/// - When `open == true`, slides out the frosted floating EQ bar with the `Lyrics` pull-tab right below it.
 pub fn view<'a>(
     open: bool,
     eq: &'a EqSettings,
     preset_names: &'a [String],
     selected_preset: Option<usize>,
+    lyrics_window_open: bool,
 ) -> Element<'a, Message> {
+    let lyrics_tab = lyrics_pull_tab(lyrics_window_open);
+
     if !open {
         let mut tab_row = widget::row::with_capacity(3)
             .push(widget::icon::from_name("go-next-symbolic").size(16))
@@ -34,61 +37,22 @@ pub fn view<'a>(
 
         let pull_tab = widget::button::custom(tab_row)
             .padding([8, 12, 8, 8])
-            .class(cosmic::theme::Button::Custom {
-                active: Box::new(|_, theme| {
-                    let cosmic = theme.cosmic();
-                    let bg: Color = cosmic.primary_container_color().into();
-                    let accent: Color = cosmic.accent_color().into();
-                    widget::button::Style {
-                        background: Some(Color { a: 0.82, ..bg }.into()),
-                        border_radius: [0.0, 12.0, 12.0, 0.0].into(),
-                        border_width: 1.0,
-                        border_color: Color { a: 0.45, ..accent },
-                        text_color: Some(cosmic.on_bg_color().into()),
-                        icon_color: Some(accent),
-                        ..Default::default()
-                    }
-                }),
-                disabled: Box::new(|_| widget::button::Style::default()),
-                hovered: Box::new(|_, theme| {
-                    let cosmic = theme.cosmic();
-                    let bg: Color = cosmic.secondary_container_color().into();
-                    let accent: Color = cosmic.accent_color().into();
-                    widget::button::Style {
-                        background: Some(Color { a: 0.94, ..bg }.into()),
-                        border_radius: [0.0, 12.0, 12.0, 0.0].into(),
-                        border_width: 1.5,
-                        border_color: accent,
-                        text_color: Some(cosmic.on_bg_color().into()),
-                        icon_color: Some(accent),
-                        ..Default::default()
-                    }
-                }),
-                pressed: Box::new(|_, theme| {
-                    let cosmic = theme.cosmic();
-                    let accent: Color = cosmic.accent_color().into();
-                    widget::button::Style {
-                        background: Some(Color { a: 0.35, ..accent }.into()),
-                        border_radius: [0.0, 12.0, 12.0, 0.0].into(),
-                        border_width: 1.5,
-                        border_color: accent,
-                        text_color: Some(cosmic.on_bg_color().into()),
-                        icon_color: Some(accent),
-                        ..Default::default()
-                    }
-                }),
-            })
+            .class(left_pull_tab_style(false))
             .on_press(Message::ToggleEqPanel);
 
-        return widget::container(
-            widget::tooltip(
+        let left_tabs = widget::column::with_capacity(2)
+            .push(widget::tooltip(
                 pull_tab,
                 widget::text::caption("Slide out Equalizer (Ctrl+E)"),
                 widget::tooltip::Position::Right,
-            ),
-        )
-        .padding([14, 0, 0, 0])
-        .into();
+            ))
+            .push(lyrics_tab)
+            .spacing(8)
+            .align_x(Alignment::Start);
+
+        return widget::container(left_tabs)
+            .padding([14, 0, 0, 0])
+            .into();
     }
 
     let spacing = cosmic::theme::spacing();
@@ -192,9 +156,96 @@ pub fn view<'a>(
             }
         }));
 
-    widget::container(frosted_panel)
+    let stacked = widget::column::with_capacity(2)
+        .push(frosted_panel)
+        .push(lyrics_tab)
+        .spacing(8)
+        .align_x(Alignment::Start);
+
+    widget::container(stacked)
         .padding([14, 16, 0, 0])
         .into()
+}
+
+fn lyrics_pull_tab<'a>(lyrics_window_open: bool) -> Element<'a, Message> {
+    let mut tab_row = widget::row::with_capacity(3)
+        .push(widget::icon::from_name("format-justify-center-symbolic").size(14))
+        .push(widget::text::caption_heading("Lyrics").size(12.5))
+        .spacing(6)
+        .align_y(Alignment::Center);
+
+    if lyrics_window_open {
+        tab_row = tab_row.push(widget::text::caption("●").size(10.0));
+    }
+
+    let btn = widget::button::custom(tab_row)
+        .padding([8, 12, 8, 9])
+        .class(left_pull_tab_style(lyrics_window_open))
+        .on_press(Message::OpenLyricsWindow);
+
+    widget::tooltip(
+        btn,
+        widget::text::caption("Open Lyrics Window (Ctrl+Y)"),
+        widget::tooltip::Position::Right,
+    )
+    .into()
+}
+
+fn left_pull_tab_style(active: bool) -> cosmic::theme::Button {
+    cosmic::theme::Button::Custom {
+        active: Box::new(move |_, theme| {
+            let cosmic = theme.cosmic();
+            let bg: Color = cosmic.primary_container_color().into();
+            let accent: Color = cosmic.accent_color().into();
+            widget::button::Style {
+                background: Some(
+                    if active {
+                        Color { a: 0.28, ..accent }
+                    } else {
+                        Color { a: 0.82, ..bg }
+                    }
+                    .into(),
+                ),
+                border_radius: [0.0, 12.0, 12.0, 0.0].into(),
+                border_width: 1.0,
+                border_color: Color {
+                    a: if active { 0.80 } else { 0.45 },
+                    ..accent
+                },
+                text_color: Some(cosmic.on_bg_color().into()),
+                icon_color: Some(accent),
+                ..Default::default()
+            }
+        }),
+        disabled: Box::new(|_| widget::button::Style::default()),
+        hovered: Box::new(|_, theme| {
+            let cosmic = theme.cosmic();
+            let bg: Color = cosmic.secondary_container_color().into();
+            let accent: Color = cosmic.accent_color().into();
+            widget::button::Style {
+                background: Some(Color { a: 0.94, ..bg }.into()),
+                border_radius: [0.0, 12.0, 12.0, 0.0].into(),
+                border_width: 1.5,
+                border_color: accent,
+                text_color: Some(cosmic.on_bg_color().into()),
+                icon_color: Some(accent),
+                ..Default::default()
+            }
+        }),
+        pressed: Box::new(|_, theme| {
+            let cosmic = theme.cosmic();
+            let accent: Color = cosmic.accent_color().into();
+            widget::button::Style {
+                background: Some(Color { a: 0.35, ..accent }.into()),
+                border_radius: [0.0, 12.0, 12.0, 0.0].into(),
+                border_width: 1.5,
+                border_color: accent,
+                text_color: Some(cosmic.on_bg_color().into()),
+                icon_color: Some(accent),
+                ..Default::default()
+            }
+        }),
+    }
 }
 
 fn eq_slider_column<'a>(

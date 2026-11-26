@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-//! Airy, drag-and-drop reorderable playlist view for the right-hand Playlist column.
+//! Airy, uniform-height drag-and-drop reorderable playlist view with hover-scrolling titles
+//! and native right-click context menus.
 
-use crate::app::{DragState, Message};
+use crate::app::{DragState, Message, TrackContextAction};
 use crate::library::metadata::{Track, format_duration};
 use crate::library::playlist::PlaylistTab;
 use cosmic::iced::alignment::Horizontal;
+use cosmic::iced::core::text::{Ellipsize, EllipsizeHeightLimit, Wrapping};
 use cosmic::iced::{Alignment, Border, Color, Length, mouse};
 use cosmic::prelude::*;
-use cosmic::widget;
+use cosmic::widget::{self, menu};
+use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
 pub fn view<'a>(
@@ -16,9 +19,13 @@ pub fn view<'a>(
     playing: Option<(u64, usize)>,
     is_playing: bool,
     selected_idx: Option<usize>,
+    hovered_idx: Option<usize>,
+    hover_scroll_secs: f32,
+    playlist_width: f32,
     drag_state: Option<DragState>,
     external_dnd_hover: bool,
     filter: &'a str,
+    context_key_binds: &'a HashMap<menu::KeyBind, TrackContextAction>,
 ) -> Element<'a, Message> {
     let spacing = cosmic::theme::spacing();
     let filter_lower = filter.trim().to_lowercase();
@@ -72,6 +79,8 @@ pub fn view<'a>(
             );
         }
 
+        // Approximate character budget for the title column based on current sidebar width.
+        let visible_title_chars = (((playlist_width - 138.0).max(80.0)) / 7.2) as usize;
         let mut visible_count = 0usize;
 
         for (idx, track) in tab.tracks.iter().enumerate() {
@@ -86,6 +95,7 @@ pub fn view<'a>(
 
             let is_current = playing == Some((tab.id, idx));
             let is_selected = selected_idx == Some(idx);
+            let is_hovered = hovered_idx == Some(idx) && active_drag.is_none();
             let is_dragged = active_drag.is_some_and(|d| d.from_idx == idx);
 
             let show_drop_above =
@@ -104,9 +114,13 @@ pub fn view<'a>(
                 is_current,
                 is_playing,
                 is_selected,
+                is_hovered,
+                hover_scroll_secs,
+                visible_title_chars,
                 is_dragged,
                 active_drag.is_some(),
                 !is_filtered,
+                context_key_binds,
             ));
 
             if show_drop_below {
@@ -193,6 +207,34 @@ pub fn view<'a>(
     content.into()
 }
 
+/// Computes a smooth back-and-forth (ping-pong) character window for long hovered track titles.
+fn marquee_slice(text: &str, visible_chars: usize, elapsed_secs: f32) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() <= visible_chars || visible_chars < 6 {
+        return text.to_string();
+    }
+    let overflow = chars.len() - visible_chars;
+    let speed_cps = 5.5_f32; // characters per second
+    let pause_secs = 0.75_f32;
+    let travel_secs = (overflow as f32 / speed_cps).max(0.4);
+    let cycle = (pause_secs + travel_secs) * 2.0;
+    let t = elapsed_secs.rem_euclid(cycle);
+
+    let offset = if t < pause_secs {
+        0usize
+    } else if t < pause_secs + travel_secs {
+        let frac = (t - pause_secs) / travel_secs;
+        ((frac * overflow as f32).round() as usize).min(overflow)
+    } else if t < pause_secs * 2.0 + travel_secs {
+        overflow
+    } else {
+        let frac = (t - (pause_secs * 2.0 + travel_secs)) / travel_secs;
+        (((1.0 - frac) * overflow as f32).round() as usize).min(overflow)
+    };
+
+    chars[offset..].iter().collect()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn track_card<'a>(
     tab_id: u64,
@@ -201,9 +243,13 @@ fn track_card<'a>(
     is_current: bool,
     is_playing: bool,
     is_selected: bool,
+    is_hovered: bool,
+    hover_scroll_secs: f32,
+    visible_title_chars: usize,
     is_dragged: bool,
     any_dragging: bool,
     allow_drag: bool,
+    context_key_binds: &'a HashMap<menu::KeyBind, TrackContextAction>,
 ) -> Element<'a, Message> {
     let lead: Element<'a, Message> = if is_current {
         let icon_name = if is_playing {
@@ -225,9 +271,27 @@ fn track_card<'a>(
         .align_y(Alignment::Center)
         .width(Length::Fixed(34.0));
 
+    let displayed_title = if is_hovered {
+        marquee_slice(&track.title, visible_title_chars, hover_scroll_secs)
+    } else {
+        track.title.clone()
+    };
+
+    let title_text = widget::text::body(displayed_title)
+        .size(13.0)
+        .wrapping(Wrapping::None)
+        .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
+        .width(Length::Fill);
+
+    let artist_text = widget::text::caption(track.display_artist())
+        .size(11.5)
+        .wrapping(Wrapping::None)
+        .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
+        .width(Length::Fill);
+
     let title_artist = widget::column::with_capacity(2)
-        .push(widget::text::body(&track.title).size(13.0))
-        .push(widget::text::caption(track.display_artist()).size(11.5))
+        .push(title_text)
+        .push(artist_text)
         .spacing(1)
         .width(Length::Fill);
 
@@ -266,6 +330,8 @@ fn track_card<'a>(
                     Color { a: 0.25, ..on_bg },
                     1.0,
                 )
+            } else if is_hovered {
+                (Color { a: 0.08, ..on_bg }, Color::TRANSPARENT, 0.0)
             } else {
                 (Color { a: 0.04, ..on_bg }, Color::TRANSPARENT, 0.0)
             };
@@ -283,12 +349,13 @@ fn track_card<'a>(
 
     let mut area = widget::mouse_area(styled)
         .on_press(Message::PlaylistRowPress(idx))
-        .on_double_click(Message::PlayTrack { tab_id, index: idx });
+        .on_double_click(Message::PlayTrack { tab_id, index: idx })
+        .on_enter(Message::PlaylistRowHover(idx))
+        .on_exit(Message::PlaylistRowExit(idx));
 
     if allow_drag {
         area = area
             .on_drag(Message::PlaylistRowStartDrag(idx))
-            .on_enter(Message::PlaylistRowHover(idx))
             .interaction(if any_dragging {
                 mouse::Interaction::Grabbing
             } else {
@@ -296,7 +363,33 @@ fn track_card<'a>(
             });
     }
 
-    area.into()
+    // Right-click native COSMIC context menu on every track row
+    let ctx_items = menu::items(
+        context_key_binds,
+        vec![
+            menu::Item::Button("Play Now", None, TrackContextAction::PlayNow(tab_id, idx)),
+            menu::Item::Button(
+                "Track Info & Tags…",
+                None,
+                TrackContextAction::EditInfo(tab_id, idx),
+            ),
+            menu::Item::Button(
+                "View Lyrics",
+                None,
+                TrackContextAction::ViewLyrics(tab_id, idx),
+            ),
+            menu::Item::Divider,
+            menu::Item::Button(
+                "Remove from Playlist",
+                None,
+                TrackContextAction::Remove(tab_id, idx),
+            ),
+        ],
+    );
+
+    widget::context_menu(area, Some(ctx_items))
+        .on_open(Message::PlaylistRowPress(idx))
+        .into()
 }
 
 /// Crisp COSMIC-accent insertion line shown between rows while drag-reordering.

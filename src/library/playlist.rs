@@ -66,6 +66,10 @@ impl PlaylistTab {
     }
 }
 
+fn default_playlist_width() -> f32 {
+    340.0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppPersistence {
     pub tabs: Vec<PlaylistTab>,
@@ -81,6 +85,10 @@ pub struct AppPersistence {
     pub show_eq: bool,
     #[serde(default)]
     pub viz_mode: VizMode,
+    #[serde(default = "default_playlist_width")]
+    pub playlist_width: f32,
+    #[serde(default)]
+    pub show_stage_lyrics: bool,
 }
 
 impl Default for AppPersistence {
@@ -107,6 +115,8 @@ impl Default for AppPersistence {
             show_library: false,
             show_eq: false,
             viz_mode: VizMode::AuroraOrbit,
+            playlist_width: default_playlist_width(),
+            show_stage_lyrics: false,
         }
     }
 }

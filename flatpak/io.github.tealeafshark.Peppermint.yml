@@ -22,8 +22,8 @@ finish-args:
   - --device=dri
   # PipeWire / PulseAudio audio playback
   - --socket=pulseaudio
-  # Read local ~/Music library by default (additional folders use XDG Portal)
-  - --filesystem=xdg-music:ro
+  # Read/write local ~/Music library for scanning and built-in tag/lyrics editing
+  - --filesystem=xdg-music:rw
   # Live COSMIC desktop theme, accent color, and frosted-window sync
   - --filesystem=xdg-config/cosmic:create
   - --talk-name=com.system76.CosmicSettingsDaemon

@@ -6,9 +6,11 @@ A fast, native local music player for the **COSMIC Desktop**, built in Rust with
 
 ## Features
 
-- **Multi-Tab Playlists:** Always-visible playlist tab strip (`+` new tab, inline rename, close tab, `Ctrl+1..9` to switch tabs without interrupting playback).
+- **Multi-Tab Resizable Playlists:** Always-visible playlist tab strip (`+` new tab, inline rename, close tab, `Ctrl+1..9` to switch tabs without interrupting playback), draggable sidebar splitter up to 50% of window width, and uniform single-line track cards that smoothly scroll long titles on hover.
 - **Full Drag-and-Drop Control:** Drag tracks to reorder them with a COSMIC-accent drop indicator, nudge with `Alt+Up`/`Alt+Down`, or drag audio files and folders straight from **COSMIC Files** onto any playlist tab.
-- **Semi-Transparent Background Visualizers:** Live post-EQ FFT visualizers floating behind the Album Art (**Aurora Orbit**, **Peppermint Kaleidoscope**, and **Cosmic Nebula** — cycle with the top-right pill or `V`).
+- **Track Info & Tag Editor:** Right-click any track (or press `Ctrl+I` / `Alt+3`) to open a frosted pop-out window showing audio file details and editing embedded Title, Artist, Album, Track #, Year, Genre, Album Art, and Lyrics directly in your music files.
+- **Stylish Lyrics Viewer:** Open a dedicated frosted Lyrics pop-out window (`Ctrl+Y` or the left-edge **Lyrics** pull-tab under `> EQ`), or cycle the main stage directly into bold **Lyrics** mode via the top-right visualizer rotation (`V`). Supports synced `.lrc` timestamps (sidecar `.lrc` files or embedded tags) with live active-line highlighting and click-to-seek, plus plain-text lyrics fallback.
+- **Semi-Transparent Background Visualizers:** Live post-EQ FFT visualizers floating behind the free-floating Album Art (**Aurora Orbit**, **Peppermint Kaleidoscope**, **Cosmic Nebula**, **Lyrics**, and **Off** — cycle with the top-right pill or `V`).
 - **Real-Time 10-Band Equalizer:** Top-left `> EQ` slide-out bar with lock-free pure-Rust biquad peaking EQ (`60`, `170`, `310`, `600`, `1K`, `3K`, `6K`, `12K`, `14K`, `16K` Hz + Preamp), live frequency-response curve, Bypass toggle, and 10 built-in presets.
 - **Collapsible Local Library:** Browse `~/Music` (or any folders) by **Tracks**, **Albums**, **Artists**, or **Folders**, filter instantly, and append tracks or entire albums to the active playlist tab.
 - **M3U / M3U8 & Auto-Persistence:** Import/export `.m3u8` playlists and automatically preserve tabs, track order, EQ, volume, and library folders in `~/.local/share/peppermint/state.json`.
@@ -27,6 +29,8 @@ A fast, native local music player for the **COSMIC Desktop**, built in Rust with
 | `Ctrl+1` – `Ctrl+9` | Switch to playlist tab 1–9 |
 | `Ctrl+E` | Toggle 10-Band Equalizer |
 | `Ctrl+L` | Toggle Local Library sidebar |
+| `Ctrl+I` / `Alt+3` | Open Track Info & Tag Editor |
+| `Ctrl+Y` | Open Lyrics Viewer window |
 | `V` | Cycle background visualizer style |
 
 ## Running

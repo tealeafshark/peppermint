@@ -15,6 +15,7 @@ pub enum VizMode {
     AuroraOrbit,
     Kaleidoscope,
     Nebula,
+    Lyrics,
     Off,
 }
 
@@ -23,7 +24,8 @@ impl VizMode {
         match self {
             Self::AuroraOrbit => Self::Kaleidoscope,
             Self::Kaleidoscope => Self::Nebula,
-            Self::Nebula => Self::Off,
+            Self::Nebula => Self::Lyrics,
+            Self::Lyrics => Self::Off,
             Self::Off => Self::AuroraOrbit,
         }
     }
@@ -33,6 +35,7 @@ impl VizMode {
             Self::AuroraOrbit => "Aurora",
             Self::Kaleidoscope => "Kaleidoscope",
             Self::Nebula => "Nebula",
+            Self::Lyrics => "Lyrics",
             Self::Off => "Viz Off",
         }
     }

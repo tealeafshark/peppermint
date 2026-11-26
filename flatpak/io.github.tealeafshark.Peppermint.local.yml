@@ -15,7 +15,7 @@ finish-args:
   - --socket=fallback-x11
   - --device=dri
   - --socket=pulseaudio
-  - --filesystem=xdg-music:ro
+  - --filesystem=xdg-music:rw
   - --filesystem=xdg-config/cosmic:create
   - --talk-name=com.system76.CosmicSettingsDaemon
   - --own-name=io.github.tealeafshark.Peppermint

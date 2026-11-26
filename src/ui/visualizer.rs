@@ -35,76 +35,95 @@ pub fn background_canvas<'a>(mode: VizMode, state: &'a VizFrameState) -> Element
     .into()
 }
 
-/// Subtle top-right pill button to cycle visualizer styles (`Aurora` / `Kaleidoscope` / `Nebula` / `Off`).
+/// Subtle top-right pill to cycle stage / visualizer styles
+/// (`Aurora` / `Kaleidoscope` / `Nebula` / `Lyrics` / `Viz Off`).
 pub fn mode_pill<'a>(mode: VizMode) -> Element<'a, Message> {
     let icon_name = match mode {
-        VizMode::Off => "view-conceal-symbolic",
-        _ => "starred-symbolic",
+        VizMode::Off => "display-brightness-off-symbolic",
+        VizMode::Lyrics => "format-justify-center-symbolic",
+        _ => "insert-star-symbolic",
     };
 
-    let content = widget::row::with_capacity(2)
+    let viz_content = widget::row::with_capacity(2)
         .push(widget::icon::from_name(icon_name).size(14))
         .push(widget::text::caption_heading(mode.label()).size(12.0))
         .spacing(5)
         .align_y(Alignment::Center);
 
-    let pill = widget::button::custom(content)
-        .padding([7, 10, 7, 12])
-        .class(cosmic::theme::Button::Custom {
-            active: Box::new(|_, theme| {
-                let cosmic = theme.cosmic();
-                let bg: Color = cosmic.primary_container_color().into();
-                let accent: Color = cosmic.accent_color().into();
-                widget::button::Style {
-                    background: Some(Color { a: 0.72, ..bg }.into()),
-                    border_radius: [12.0, 0.0, 0.0, 12.0].into(),
-                    border_width: 1.0,
-                    border_color: Color { a: 0.32, ..accent },
-                    text_color: Some(cosmic.on_bg_color().into()),
-                    icon_color: Some(accent),
-                    ..Default::default()
-                }
-            }),
-            disabled: Box::new(|_| widget::button::Style::default()),
-            hovered: Box::new(|_, theme| {
-                let cosmic = theme.cosmic();
-                let bg: Color = cosmic.secondary_container_color().into();
-                let accent: Color = cosmic.accent_color().into();
-                widget::button::Style {
-                    background: Some(Color { a: 0.90, ..bg }.into()),
-                    border_radius: [12.0, 0.0, 0.0, 12.0].into(),
-                    border_width: 1.5,
-                    border_color: accent,
-                    text_color: Some(cosmic.on_bg_color().into()),
-                    icon_color: Some(accent),
-                    ..Default::default()
-                }
-            }),
-            pressed: Box::new(|_, theme| {
-                let cosmic = theme.cosmic();
-                let accent: Color = cosmic.accent_color().into();
-                widget::button::Style {
-                    background: Some(Color { a: 0.30, ..accent }.into()),
-                    border_radius: [12.0, 0.0, 0.0, 12.0].into(),
-                    border_width: 1.5,
-                    border_color: accent,
-                    text_color: Some(cosmic.on_bg_color().into()),
-                    icon_color: Some(accent),
-                    ..Default::default()
-                }
-            }),
-        })
+    let viz_btn = widget::button::custom(viz_content)
+        .padding([7, 12, 7, 12])
+        .class(stage_pill_style(
+            mode == VizMode::Lyrics,
+            [12.0, 0.0, 0.0, 12.0],
+        ))
         .on_press(Message::CycleVizMode);
 
     widget::container(widget::tooltip(
-        pill,
-        widget::text::caption("Switch Visualizer Style (V)"),
-        widget::tooltip::Position::Left,
+        viz_btn,
+        widget::text::caption("Switch Visualizer / Lyrics Mode (V)"),
+        widget::tooltip::Position::Bottom,
     ))
     .width(Length::Fill)
     .align_x(Horizontal::Right)
     .padding([14, 0, 0, 0])
     .into()
+}
+
+fn stage_pill_style(active: bool, radius: [f32; 4]) -> cosmic::theme::Button {
+    cosmic::theme::Button::Custom {
+        active: Box::new(move |_, theme| {
+            let cosmic = theme.cosmic();
+            let bg: Color = cosmic.primary_container_color().into();
+            let accent: Color = cosmic.accent_color().into();
+            widget::button::Style {
+                background: Some(
+                    if active {
+                        Color { a: 0.28, ..accent }
+                    } else {
+                        Color { a: 0.72, ..bg }
+                    }
+                    .into(),
+                ),
+                border_radius: radius.into(),
+                border_width: 1.0,
+                border_color: Color {
+                    a: if active { 0.80 } else { 0.32 },
+                    ..accent
+                },
+                text_color: Some(cosmic.on_bg_color().into()),
+                icon_color: Some(accent),
+                ..Default::default()
+            }
+        }),
+        disabled: Box::new(|_| widget::button::Style::default()),
+        hovered: Box::new(move |_, theme| {
+            let cosmic = theme.cosmic();
+            let bg: Color = cosmic.secondary_container_color().into();
+            let accent: Color = cosmic.accent_color().into();
+            widget::button::Style {
+                background: Some(Color { a: 0.90, ..bg }.into()),
+                border_radius: radius.into(),
+                border_width: 1.5,
+                border_color: accent,
+                text_color: Some(cosmic.on_bg_color().into()),
+                icon_color: Some(accent),
+                ..Default::default()
+            }
+        }),
+        pressed: Box::new(move |_, theme| {
+            let cosmic = theme.cosmic();
+            let accent: Color = cosmic.accent_color().into();
+            widget::button::Style {
+                background: Some(Color { a: 0.30, ..accent }.into()),
+                border_radius: radius.into(),
+                border_width: 1.5,
+                border_color: accent,
+                text_color: Some(cosmic.on_bg_color().into()),
+                icon_color: Some(accent),
+                ..Default::default()
+            }
+        }),
+    }
 }
 
 struct VisualizerProgram {
@@ -131,6 +150,7 @@ impl canvas::Program<Message, cosmic::Theme, Renderer> for VisualizerProgram {
             VizMode::AuroraOrbit => draw_aurora_orbit(&mut frame, bounds, &self.viz, &palette),
             VizMode::Kaleidoscope => draw_kaleidoscope(&mut frame, bounds, &self.viz, &palette),
             VizMode::Nebula => draw_nebula(&mut frame, bounds, &self.viz, &palette),
+            VizMode::Lyrics => draw_lyrics_ambient(&mut frame, bounds, &self.viz, &palette),
             VizMode::Off => {}
         }
 
@@ -184,6 +204,41 @@ fn mix_color(a: Color, b: Color, t: f32) -> Color {
         g: a.g + (b.g - a.g) * t,
         b: a.b + (b.b - a.b) * t,
         a: 1.0,
+    }
+}
+
+/// Subtle breathing ambient color wash rendered softly behind the main-window Lyrics mode.
+fn draw_lyrics_ambient(
+    frame: &mut Frame,
+    bounds: Rectangle,
+    viz: &VizFrameState,
+    pal: &VizPalette,
+) {
+    let t = viz.time;
+    let w = bounds.width;
+    let h = bounds.height;
+    let min_dim = w.min(h);
+
+    let centers = [
+        Point::new(
+            w * (0.32 + 0.08 * (t * 0.25).sin()),
+            h * (0.36 + 0.06 * (t * 0.19).cos()),
+        ),
+        Point::new(
+            w * (0.68 + 0.08 * (t * 0.21 + 2.1).cos()),
+            h * (0.62 + 0.07 * (t * 0.17 + 1.0).sin()),
+        ),
+    ];
+
+    for (i, c) in centers.iter().enumerate() {
+        let base_r = min_dim * (0.36 + viz.bass * 0.10 + (i as f32) * 0.06);
+        for layer in (0..4).rev() {
+            let frac = (layer as f32 + 1.0) / 4.0;
+            let r = base_r * (0.55 + frac * 0.65);
+            let alpha = (0.022 + viz.energy * 0.024) * (1.15 - frac * 0.78);
+            let color = pal.sample(t * 0.03 + (i as f32) * 0.42 + frac * 0.15, alpha);
+            frame.fill(&Path::circle(*c, r), color);
+        }
     }
 }
 

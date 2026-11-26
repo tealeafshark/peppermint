@@ -84,7 +84,7 @@ pub fn view<'a>(
 
         if is_active {
             chip_inner = chip_inner.push(
-                widget::button::icon(widget::icon::from_name("document-edit-symbolic"))
+                widget::button::icon(widget::icon::from_name("edit-symbolic"))
                     .icon_size(11)
                     .padding(2)
                     .on_press(Message::BeginRenameTab(tab.id))
@@ -223,7 +223,7 @@ pub fn view<'a>(
                 .tooltip("Randomize Playlist Order"),
         )
         .push(
-            widget::button::icon(widget::icon::from_name("edit-clear-all-symbolic"))
+            widget::button::icon(widget::icon::from_name("edit-clear-symbolic"))
                 .icon_size(15)
                 .padding(5)
                 .on_press(Message::ClearActivePlaylist)
