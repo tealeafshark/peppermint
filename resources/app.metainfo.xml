@@ -15,10 +15,12 @@
       the tactile playlist-first feel of classic players to a modern Wayland desktop.
     </p>
     <ul>
-      <li>Multi-tab playlists: switch tabs without interrupting playback, rename inline, and import/export M3U8 files.</li>
+      <li>Multi-tab resizable playlists: switch tabs without interrupting playback, rename inline, hover-scroll long track titles, and import/export M3U8 files.</li>
       <li>Full drag-and-drop ordering: drag tracks to reorder or drop audio files and folders straight from COSMIC Files.</li>
+      <li>Built-in Track Info and Tag Editor: inspect audio file details and edit embedded tags, album art, and lyrics directly in your music files.</li>
+      <li>Stylish Lyrics Viewer: bold synced LRC and plain-text lyrics in a separate frosted pop-out window or inside the main stage visualizer rotation.</li>
       <li>Slide-out 10-band graphic equalizer: real-time pure-Rust biquad DSP with preamp, bypass, presets, and a live response curve.</li>
-      <li>Semi-transparent background visualizers: Aurora Orbit, Kaleidoscope, and Cosmic Nebula floating behind your album art.</li>
+      <li>Semi-transparent background visualizers: Aurora Orbit, Kaleidoscope, and Cosmic Nebula floating behind free-floating album art.</li>
       <li>Collapsible local library browser supporting MP3, FLAC, OGG, Opus, WAV, M4A, AAC, and AIFF.</li>
     </ul>
   </description>
@@ -63,6 +65,17 @@
     <keyword>Visualizer</keyword>
   </keywords>
   <releases>
+    <release version="0.2.0" date="2026-11-26">
+      <description>
+        <p>Major feature and polish update for Peppermint on the COSMIC desktop.</p>
+        <ul>
+          <li>Resizable playlist sidebar (up to 50% of window width) with uniform single-line track cards and hover-scrolling titles.</li>
+          <li>Separate frosted Track Info and Tag Editor window to view file details and edit embedded tags, album art, and lyrics.</li>
+          <li>Bold synced and plain-text Lyrics Viewer available both as a pop-out window (under the EQ tab) and inside the main visualizer rotation.</li>
+          <li>Free-floating album art with drop shadow, fixed Wayland/Flatpak file drag-and-drop, and 100% native COSMIC symbolic icons.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-11-26">
       <description>
         <p>Initial release of Peppermint for the COSMIC desktop.</p>
