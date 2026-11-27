@@ -16,9 +16,8 @@ finish-args:
   - --device=dri
   - --socket=pulseaudio
   - --filesystem=xdg-music:rw
-  - --filesystem=xdg-config/cosmic:create
+  - --filesystem=xdg-config/cosmic:ro
   - --talk-name=com.system76.CosmicSettingsDaemon
-  - --own-name=io.github.tealeafshark.Peppermint
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin

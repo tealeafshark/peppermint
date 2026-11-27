@@ -73,6 +73,6 @@ flatpak run io.github.tealeafshark.Peppermint
 
 COSMIC Store automatically discovers and highlights native COSMIC apps from Flathub that include `<provides><id>com.system76.CosmicApplication</id></provides>` (already configured in `resources/app.metainfo.xml`).
 
-1. Tag a release on GitHub (`v0.1.0`) and add the commit SHA to `flatpak/io.github.tealeafshark.Peppermint.yml`.
-2. Generate `flatpak/cargo-sources.json` using `flatpak-cargo-generator.py`.
+1. Ensure the latest release tag (e.g., `v0.3.1`) and commit SHA are pinned in `flatpak/io.github.tealeafshark.Peppermint.yml`.
+2. Regenerate `flatpak/cargo-sources.json` with `flatpak-cargo-generator.py` whenever `Cargo.lock` dependencies change (already up-to-date in `flatpak/cargo-sources.json`).
 3. Open a Pull Request to `flathub/flathub` targeting the `new-pr` branch with `io.github.tealeafshark.Peppermint.yml` and `cargo-sources.json`.

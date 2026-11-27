@@ -1,9 +1,7 @@
 # Flathub / COSMIC Store Flatpak manifest for Peppermint
 #
-# Before submitting to Flathub (https://github.com/flathub/flathub -> `new-pr` branch):
-# 1. Generate `cargo-sources.json` using flatpak-builder-tools:
-#      python3 flatpak-cargo-generator.py Cargo.lock -o flatpak/cargo-sources.json
-# 2. Fill in the exact 40-char commit SHA for tag `v0.3.0` below.
+# Ready for submission to Flathub (https://github.com/flathub/flathub -> `new-pr` branch)
+# along with `flatpak/cargo-sources.json`.
 
 id: io.github.tealeafshark.Peppermint
 runtime: org.freedesktop.Platform
@@ -24,11 +22,9 @@ finish-args:
   - --socket=pulseaudio
   # Read/write local ~/Music library for scanning and built-in tag/lyrics editing
   - --filesystem=xdg-music:rw
-  # Live COSMIC desktop theme, accent color, and frosted-window sync
-  - --filesystem=xdg-config/cosmic:create
+  # Read-only host COSMIC desktop theme and accent color sync
+  - --filesystem=xdg-config/cosmic:ro
   - --talk-name=com.system76.CosmicSettingsDaemon
-  # Single-instance D-Bus activation
-  - --own-name=io.github.tealeafshark.Peppermint
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
@@ -39,7 +35,6 @@ modules:
   - name: peppermint
     buildsystem: simple
     build-commands:
-      - cargo --offline fetch --manifest-path Cargo.toml --verbose
       - cargo --offline build --release --verbose
       - install -Dm0755 target/release/peppermint /app/bin/peppermint
       - install -Dm0644 target/xdgen/app.desktop /app/share/applications/${FLATPAK_ID}.desktop

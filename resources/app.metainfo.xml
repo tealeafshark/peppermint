@@ -67,6 +67,15 @@
     <keyword>Visualizer</keyword>
   </keywords>
   <releases>
+    <release version="0.3.1" date="2026-11-27">
+      <description>
+        <p>Standalone botanical app icon and Flathub packaging polish.</p>
+        <ul>
+          <li>New transparent-background botanical peppermint sprig app icon.</li>
+          <li>Tightened Flatpak sandbox permissions (read-only host COSMIC theme config) and full GPL-3.0 license documentation for Flathub and COSMIC Store readiness.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-11-27">
       <description>
         <p>Gapless audio engine upgrade and native frosted Settings window.</p>
