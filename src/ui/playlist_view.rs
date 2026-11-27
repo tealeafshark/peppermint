@@ -6,6 +6,7 @@
 use crate::app::{DragState, Message, TrackContextAction};
 use crate::library::metadata::{Track, format_duration};
 use crate::library::playlist::PlaylistTab;
+use crate::settings::RowDensity;
 use cosmic::iced::alignment::Horizontal;
 use cosmic::iced::core::text::{Ellipsize, EllipsizeHeightLimit, Wrapping};
 use cosmic::iced::{Alignment, Border, Color, Length, mouse};
@@ -21,6 +22,8 @@ pub fn view<'a>(
     selected_idx: Option<usize>,
     hovered_idx: Option<usize>,
     hover_scroll_secs: f32,
+    hover_marquee: bool,
+    row_density: RowDensity,
     playlist_width: f32,
     drag_state: Option<DragState>,
     external_dnd_hover: bool,
@@ -66,8 +69,12 @@ pub fn view<'a>(
             .padding(24)
             .into()
     } else {
+        let row_spacing = match row_density {
+            RowDensity::Compact => 1,
+            RowDensity::Comfortable => 3,
+        };
         let mut rows = widget::column::with_capacity(tab.tracks.len() + 2)
-            .spacing(3)
+            .spacing(row_spacing)
             .padding([6, 8, 12, 8]);
 
         if is_filtered {
@@ -116,6 +123,8 @@ pub fn view<'a>(
                 is_selected,
                 is_hovered,
                 hover_scroll_secs,
+                hover_marquee,
+                row_density,
                 visible_title_chars,
                 is_dragged,
                 active_drag.is_some(),
@@ -245,6 +254,8 @@ fn track_card<'a>(
     is_selected: bool,
     is_hovered: bool,
     hover_scroll_secs: f32,
+    hover_marquee: bool,
+    row_density: RowDensity,
     visible_title_chars: usize,
     is_dragged: bool,
     any_dragging: bool,
@@ -271,20 +282,25 @@ fn track_card<'a>(
         .align_y(Alignment::Center)
         .width(Length::Fixed(34.0));
 
-    let displayed_title = if is_hovered {
+    let displayed_title = if is_hovered && hover_marquee {
         marquee_slice(&track.title, visible_title_chars, hover_scroll_secs)
     } else {
         track.title.clone()
     };
 
+    let (title_size, artist_size, pad_v) = match row_density {
+        RowDensity::Compact => (12.5, 10.5, 4),
+        RowDensity::Comfortable => (13.0, 11.5, 7),
+    };
+
     let title_text = widget::text::body(displayed_title)
-        .size(13.0)
+        .size(title_size)
         .wrapping(Wrapping::None)
         .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
         .width(Length::Fill);
 
     let artist_text = widget::text::caption(track.display_artist())
-        .size(11.5)
+        .size(artist_size)
         .wrapping(Wrapping::None)
         .ellipsize(Ellipsize::End(EllipsizeHeightLimit::Lines(1)))
         .width(Length::Fill);
@@ -292,7 +308,7 @@ fn track_card<'a>(
     let title_artist = widget::column::with_capacity(2)
         .push(title_text)
         .push(artist_text)
-        .spacing(1)
+        .spacing(if row_density == RowDensity::Compact { 0 } else { 1 })
         .width(Length::Fill);
 
     let dur = widget::text::caption(format_duration(track.duration_secs)).size(11.5);
@@ -309,7 +325,7 @@ fn track_card<'a>(
         .push(dur)
         .push(remove_btn)
         .spacing(6)
-        .padding([7, 8])
+        .padding([pad_v, 8])
         .align_y(Alignment::Center)
         .width(Length::Fill);
 

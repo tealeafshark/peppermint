@@ -5,9 +5,10 @@
 use crate::audio::eq::EqSettings;
 use crate::audio::visualizer::VizMode;
 use crate::library::metadata::{Track, read_track_metadata};
+use crate::settings::{AppSettings, M3uPathMode};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum RepeatMode {
@@ -89,6 +90,10 @@ pub struct AppPersistence {
     pub playlist_width: f32,
     #[serde(default)]
     pub show_stage_lyrics: bool,
+    #[serde(default)]
+    pub settings: AppSettings,
+    #[serde(default)]
+    pub last_playing: Option<(u64, usize)>,
 }
 
 impl Default for AppPersistence {
@@ -117,6 +122,8 @@ impl Default for AppPersistence {
             viz_mode: VizMode::AuroraOrbit,
             playlist_width: default_playlist_width(),
             show_stage_lyrics: false,
+            settings: AppSettings::default(),
+            last_playing: None,
         }
     }
 }
@@ -141,6 +148,7 @@ pub fn load_state() -> AppPersistence {
     if !state.tabs.iter().any(|t| t.id == state.active_tab_id) {
         state.active_tab_id = state.tabs[0].id;
     }
+    state.settings = state.settings.clamped();
     state
 }
 
@@ -185,8 +193,9 @@ pub fn import_m3u(path: &Path) -> Result<Vec<Track>, String> {
     Ok(tracks)
 }
 
-/// Exports a playlist tab to an `.m3u8` file.
-pub fn export_m3u8(path: &Path, tracks: &[Track]) -> Result<(), String> {
+/// Exports a playlist tab to an `.m3u8` file with absolute or relative track paths.
+pub fn export_m3u8(path: &Path, tracks: &[Track], path_mode: M3uPathMode) -> Result<(), String> {
+    let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
     let mut out = String::from("#EXTM3U\n");
     for track in tracks {
         let artist_prefix = if track.artist.is_empty() {
@@ -194,15 +203,42 @@ pub fn export_m3u8(path: &Path, tracks: &[Track]) -> Result<(), String> {
         } else {
             format!("{} - ", track.artist)
         };
+        let exported_path = match path_mode {
+            M3uPathMode::Absolute => track.path.clone(),
+            M3uPathMode::Relative => relative_path(&track.path, base_dir).unwrap_or_else(|| track.path.clone()),
+        };
         out.push_str(&format!(
             "#EXTINF:{},{}{}\n{}\n",
             track.duration_secs,
             artist_prefix,
             track.title,
-            track.path.display()
+            exported_path.display()
         ));
     }
     fs::write(path, out).map_err(|e| format!("Failed to write playlist: {e}"))
+}
+
+fn relative_path(target: &Path, base: &Path) -> Option<PathBuf> {
+    let target_comps: Vec<Component<'_>> = target.components().collect();
+    let base_comps: Vec<Component<'_>> = base.components().collect();
+    let mut common = 0usize;
+    while common < target_comps.len()
+        && common < base_comps.len()
+        && target_comps[common] == base_comps[common]
+    {
+        common += 1;
+    }
+    if common == 0 && target.is_absolute() && base.is_absolute() {
+        return None;
+    }
+    let mut rel = PathBuf::new();
+    for _ in common..base_comps.len() {
+        rel.push("..");
+    }
+    for comp in &target_comps[common..] {
+        rel.push(comp.as_os_str());
+    }
+    Some(rel)
 }
 
 fn percent_decode(input: &str) -> String {

@@ -343,6 +343,96 @@ pub fn read_embedded_lyrics(path: &Path) -> Option<String> {
     tag.get_string(&ItemKey::Lyrics).map(ToString::to_string)
 }
 
+/// ReplayGain tag values extracted from audio metadata (in dB and linear peak).
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ReplayGainInfo {
+    pub track_gain_db: Option<f32>,
+    pub track_peak: Option<f32>,
+    pub album_gain_db: Option<f32>,
+    pub album_peak: Option<f32>,
+}
+
+impl ReplayGainInfo {
+    /// Returns the linear gain multiplier for the chosen ReplayGain mode, with peak protection.
+    pub fn linear_gain(&self, mode: crate::settings::ReplayGainMode) -> f32 {
+        use crate::settings::ReplayGainMode;
+        let (gain_db, peak) = match mode {
+            ReplayGainMode::Off => return 1.0,
+            ReplayGainMode::Track => {
+                if self.track_gain_db.is_some() {
+                    (self.track_gain_db, self.track_peak)
+                } else {
+                    (self.album_gain_db, self.album_peak)
+                }
+            }
+            ReplayGainMode::Album => {
+                if self.album_gain_db.is_some() {
+                    (self.album_gain_db, self.album_peak)
+                } else {
+                    (self.track_gain_db, self.track_peak)
+                }
+            }
+        };
+
+        let Some(db) = gain_db else {
+            return 1.0;
+        };
+        let mut linear = 10.0_f32.powf(db / 20.0);
+        if let Some(p) = peak
+            && p > 0.0
+            && linear * p > 1.0
+        {
+            linear = 1.0 / p;
+        }
+        linear.clamp(0.1, 4.0)
+    }
+}
+
+/// Reads `REPLAYGAIN_*` tags from an audio file (supports ID3v2 TXXX, Vorbis/FLAC, MP4, APE).
+pub fn read_replay_gain(path: &Path) -> ReplayGainInfo {
+    let mut info = ReplayGainInfo::default();
+    let Ok(tagged_file) = Probe::open(path).and_then(|p| p.read()) else {
+        return info;
+    };
+    let Some(tag) = tagged_file
+        .primary_tag()
+        .or_else(|| tagged_file.first_tag())
+    else {
+        return info;
+    };
+
+    for item in tag.items() {
+        let Some(text) = item.value().text() else {
+            continue;
+        };
+        let key_name = match item.key() {
+            ItemKey::ReplayGainTrackGain => "REPLAYGAIN_TRACK_GAIN",
+            ItemKey::ReplayGainTrackPeak => "REPLAYGAIN_TRACK_PEAK",
+            ItemKey::ReplayGainAlbumGain => "REPLAYGAIN_ALBUM_GAIN",
+            ItemKey::ReplayGainAlbumPeak => "REPLAYGAIN_ALBUM_PEAK",
+            ItemKey::Unknown(k) => k.as_str(),
+            _ => continue,
+        };
+        if key_name.eq_ignore_ascii_case("REPLAYGAIN_TRACK_GAIN") {
+            info.track_gain_db = parse_gain_db(text);
+        } else if key_name.eq_ignore_ascii_case("REPLAYGAIN_TRACK_PEAK") {
+            info.track_peak = text.trim().parse::<f32>().ok().filter(|v| v.is_finite() && *v > 0.0);
+        } else if key_name.eq_ignore_ascii_case("REPLAYGAIN_ALBUM_GAIN") {
+            info.album_gain_db = parse_gain_db(text);
+        } else if key_name.eq_ignore_ascii_case("REPLAYGAIN_ALBUM_PEAK") {
+            info.album_peak = text.trim().parse::<f32>().ok().filter(|v| v.is_finite() && *v > 0.0);
+        }
+    }
+
+    info
+}
+
+fn parse_gain_db(raw: &str) -> Option<f32> {
+    let token = raw.trim().split_whitespace().next()?;
+    let trimmed = token.trim_end_matches(|c: char| c.eq_ignore_ascii_case(&'d') || c.eq_ignore_ascii_case(&'b'));
+    trimmed.parse::<f32>().ok().filter(|v| v.is_finite())
+}
+
 pub fn format_duration(secs: u64) -> String {
     let hours = secs / 3600;
     let mins = (secs % 3600) / 60;

@@ -6,6 +6,8 @@ A fast, native local music player for the **COSMIC Desktop**, built in Rust with
 
 ## Features
 
+- **Gapless Playback & Crossfade:** Pre-decodes the upcoming track on the audio thread for seamless 0 ms transitions on live albums and continuous mixes, with optional equal-power crossfade, ReplayGain normalization, and soft pause/resume fading.
+- **Settings Window (`Ctrl+,`):** Frosted pop-out Settings window with categorized tabs (**Audio & Playback**, **Appearance**, **Library & Playlists**, and **Lyrics & Shortcuts**) — tune gapless/crossfade, ReplayGain, frosted glass opacity, visualizer FPS, playlist density, duplicate handling, M3U path format, and lyrics display live.
 - **Multi-Tab Resizable Playlists:** Always-visible playlist tab strip (`+` new tab, inline rename, close tab, `Ctrl+1..9` to switch tabs without interrupting playback), draggable sidebar splitter up to 50% of window width, and uniform single-line track cards that smoothly scroll long titles on hover.
 - **Full Drag-and-Drop Control:** Drag tracks to reorder them with a COSMIC-accent drop indicator, nudge with `Alt+Up`/`Alt+Down`, or drag audio files and folders straight from **COSMIC Files** onto any playlist tab.
 - **Track Info & Tag Editor:** Right-click any track (or press `Ctrl+I` / `Alt+3`) to open a frosted pop-out window showing audio file details and editing embedded Title, Artist, Album, Track #, Year, Genre, Album Art, and Lyrics directly in your music files.
@@ -31,6 +33,7 @@ A fast, native local music player for the **COSMIC Desktop**, built in Rust with
 | `Ctrl+L` | Toggle Local Library sidebar |
 | `Ctrl+I` / `Alt+3` | Open Track Info & Tag Editor |
 | `Ctrl+Y` | Open Lyrics Viewer window |
+| `Ctrl+,` | Open Settings window |
 | `V` | Cycle background visualizer style |
 
 ## Running

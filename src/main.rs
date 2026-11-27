@@ -5,6 +5,7 @@ mod audio;
 mod config;
 mod i18n;
 mod library;
+mod settings;
 mod ui;
 
 /// Loads the user's real COSMIC system theme (`ThemeType::System`) even inside Flatpak where

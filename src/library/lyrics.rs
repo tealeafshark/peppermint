@@ -3,6 +3,7 @@
 //! Synced `.lrc` and plain-text lyrics loader & parser.
 
 use crate::library::metadata::read_embedded_lyrics;
+use crate::settings::LyricsPriority;
 use std::fs;
 use std::path::Path;
 
@@ -40,24 +41,33 @@ impl ParsedLyrics {
     }
 }
 
-/// Loads lyrics for a track: checks for a matching `.lrc` sidecar file first,
-/// then falls back to embedded lyrics tags inside the audio file.
-pub fn load_lyrics_for_track(path: &Path) -> Option<ParsedLyrics> {
-    let lrc_path = path.with_extension("lrc");
-    if lrc_path.is_file()
-        && let Ok(raw) = fs::read_to_string(&lrc_path)
-        && let Some(parsed) = parse_lyrics(&raw, "LRC file")
-    {
-        return Some(parsed);
-    }
+/// Loads lyrics for a track using the user's preferred source priority
+/// (sidecar `.lrc` file vs. embedded lyrics tags).
+pub fn load_lyrics_for_track(path: &Path, priority: LyricsPriority) -> Option<ParsedLyrics> {
+    let load_sidecar = || {
+        let lrc_path = path.with_extension("lrc");
+        if lrc_path.is_file()
+            && let Ok(raw) = fs::read_to_string(&lrc_path)
+            && let Some(parsed) = parse_lyrics(&raw, "LRC file")
+        {
+            return Some(parsed);
+        }
+        None
+    };
 
-    if let Some(embedded) = read_embedded_lyrics(path)
-        && let Some(parsed) = parse_lyrics(&embedded, "Embedded")
-    {
-        return Some(parsed);
-    }
+    let load_embedded = || {
+        if let Some(embedded) = read_embedded_lyrics(path)
+            && let Some(parsed) = parse_lyrics(&embedded, "Embedded")
+        {
+            return Some(parsed);
+        }
+        None
+    };
 
-    None
+    match priority {
+        LyricsPriority::SidecarFirst => load_sidecar().or_else(load_embedded),
+        LyricsPriority::EmbeddedFirst => load_embedded().or_else(load_sidecar),
+    }
 }
 
 /// Parses either timestamped LRC lyrics (`[mm:ss.xx] Line`) or plain unsynchronized lyrics.

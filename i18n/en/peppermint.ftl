@@ -14,4 +14,5 @@ library = Library
 equalizer = Equalizer
 lyrics-window = Lyrics Window
 stage-lyrics = Stage Lyrics Overlay
+settings = Settings…
 new-playlist = New Playlist

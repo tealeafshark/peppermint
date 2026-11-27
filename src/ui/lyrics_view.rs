@@ -22,6 +22,7 @@ pub fn window_view<'a>(
     lyrics: Option<&'a ParsedLyrics>,
     position_ms: u64,
     is_playing: bool,
+    font_scale: f32,
 ) -> Element<'a, Message> {
     let header_title = track
         .map(|t| format!("Lyrics — {}", t.title))
@@ -106,7 +107,7 @@ pub fn window_view<'a>(
         .align_y(Alignment::Center)
         .width(Length::Fill);
 
-    let body = lyrics_scroll_body(track, lyrics, position_ms, true);
+    let body = lyrics_scroll_body(track, lyrics, position_ms, true, font_scale);
 
     let full = widget::column::with_capacity(4)
         .push(header)
@@ -143,6 +144,7 @@ pub fn stage_view<'a>(
     artwork: Option<&'a widget::image::Handle>,
     lyrics: Option<&'a ParsedLyrics>,
     position_ms: u64,
+    font_scale: f32,
 ) -> Element<'a, Message> {
     let mini_art: Element<'a, Message> = if let Some(handle) = artwork {
         widget::image(handle.clone())
@@ -191,7 +193,7 @@ pub fn stage_view<'a>(
         .padding([16, 108, 6, 108])
         .width(Length::Fill);
 
-    let body = lyrics_scroll_body(track, lyrics, position_ms, false);
+    let body = lyrics_scroll_body(track, lyrics, position_ms, false, font_scale);
 
     widget::column::with_capacity(2)
         .push(header_box)
@@ -206,6 +208,7 @@ fn lyrics_scroll_body<'a>(
     lyrics: Option<&'a ParsedLyrics>,
     position_ms: u64,
     large_window: bool,
+    font_scale: f32,
 ) -> Element<'a, Message> {
     let Some(parsed) = lyrics else {
         let mut empty = widget::column::with_capacity(3)
@@ -257,7 +260,7 @@ fn lyrics_scroll_body<'a>(
         if parsed.is_synced {
             let is_active = active_idx == Some(idx);
             let distance = active_idx.map(|a| a.abs_diff(idx)).unwrap_or(1);
-            let font_size = if is_active {
+            let base_font_size = if is_active {
                 if large_window { 30.0 } else { 26.0 }
             } else if distance == 1 {
                 if large_window { 23.0 } else { 20.5 }
@@ -266,6 +269,7 @@ fn lyrics_scroll_body<'a>(
             } else {
                 if large_window { 19.0 } else { 17.0 }
             };
+            let font_size = base_font_size * font_scale;
 
             let style_fn: fn(&cosmic::Theme) -> cosmic::iced::widget::text::Style = if is_active {
                 active_lyric_style
@@ -316,7 +320,7 @@ fn lyrics_scroll_body<'a>(
         } else {
             let line_el = widget::text(display)
                 .font(bold_font)
-                .size(if large_window { 23.0 } else { 20.5 })
+                .size((if large_window { 23.0 } else { 20.5 }) * font_scale)
                 .align_x(Horizontal::Center)
                 .class(cosmic::theme::Text::Custom(plain_lyric_style));
             col = col.push(widget::container(line_el).max_width(660.0));
