@@ -15,6 +15,8 @@
       the tactile playlist-first feel of classic players to a modern Wayland desktop.
     </p>
     <ul>
+      <li>Gapless audio playback and optional equal-power crossfade with ReplayGain loudness normalization and soft pause/resume fading.</li>
+      <li>Frosted pop-out Settings window with categorized tabs for Audio and Playback, Appearance, Library and Playlists, and Lyrics and Shortcuts.</li>
       <li>Multi-tab resizable playlists: switch tabs without interrupting playback, rename inline, hover-scroll long track titles, and import/export M3U8 files.</li>
       <li>Full drag-and-drop ordering: drag tracks to reorder or drop audio files and folders straight from COSMIC Files.</li>
       <li>Built-in Track Info and Tag Editor: inspect audio file details and edit embedded tags, album art, and lyrics directly in your music files.</li>
@@ -65,6 +67,17 @@
     <keyword>Visualizer</keyword>
   </keywords>
   <releases>
+    <release version="0.3.0" date="2026-11-27">
+      <description>
+        <p>Gapless audio engine upgrade and native frosted Settings window.</p>
+        <ul>
+          <li>True 0 ms gapless playback via background next-track pre-decoding with seamless sample-rate and channel handling.</li>
+          <li>Optional equal-power crossfade (1–10 s), ReplayGain track/album loudness normalization with peak limiting, and soft pause/resume fading.</li>
+          <li>New frosted pop-out Settings window (Ctrl+,) with four tabs: Audio and Playback, Appearance, Library and Playlists, and Lyrics and Shortcuts.</li>
+          <li>Live customization of frosted stage and playlist opacity, visualizer FPS, playlist row density, duplicate filtering, relative M3U8 export, startup resume, and lyrics font size/source priority.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-26">
       <description>
         <p>Major feature and polish update for Peppermint on the COSMIC desktop.</p>
