@@ -1,127 +1,130 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
-    <!-- Outer COSMIC squircle background gradient -->
-    <linearGradient id="bgGrad" x1="16" y1="10" x2="112" y2="118" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#34d399"/>
-      <stop offset="48%" stop-color="#059669"/>
-      <stop offset="100%" stop-color="#064e3b"/>
+    <!-- Front peppermint leaf: crisp cool mint-aqua to vibrant peppermint emerald -->
+    <linearGradient id="frontLeafGrad" x1="34" y1="14" x2="94" y2="94" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="44%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
     </linearGradient>
 
-    <!-- Soft ambient radial mint light inside the squircle -->
-    <radialGradient id="tileGlow" cx="28%" cy="22%" r="55%">
-      <stop offset="0%" stop-color="#a7f3d0" stop-opacity="0.34"/>
-      <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
-    </radialGradient>
-
-    <!-- Subtle top-left bevel highlight on squircle -->
-    <linearGradient id="rimLight" x1="16" y1="10" x2="112" y2="118" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#a7f3d0" stop-opacity="0.72"/>
-      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#022c22" stop-opacity="0.50"/>
+    <!-- Back companion mint leaf: slightly cooler, deeper spearmint-teal for natural depth -->
+    <linearGradient id="backLeafGrad" x1="34" y1="16" x2="92" y2="94" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2dd4bf"/>
+      <stop offset="48%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#0f766e"/>
     </linearGradient>
 
-    <!-- Creamy mint disc base -->
-    <radialGradient id="discBase" cx="44%" cy="38%" r="68%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="68%" stop-color="#ecfdf5"/>
-      <stop offset="100%" stop-color="#a7f3d0"/>
-    </radialGradient>
-
-    <!-- Lush peppermint swirl stripe gradient -->
-    <linearGradient id="swirlGrad" x1="64" y1="24" x2="104" y2="86" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#fb7185"/>
-      <stop offset="55%" stop-color="#f43f5e"/>
-      <stop offset="100%" stop-color="#be123c"/>
+    <!-- Subtle half-leaf fold shading matching Nettle's sculptural style -->
+    <linearGradient id="leafShade" x1="64" y1="14" x2="96" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#022c22" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#022c22" stop-opacity="0.08"/>
     </linearGradient>
 
-    <!-- Deep emerald-teal center hub -->
-    <linearGradient id="hubGrad" x1="50" y1="48" x2="78" y2="80" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#115e59"/>
-      <stop offset="55%" stop-color="#064e3b"/>
-      <stop offset="100%" stop-color="#022c22"/>
+    <!-- Stem gradient -->
+    <linearGradient id="stemGrad" x1="60" y1="86" x2="48" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#065f46"/>
     </linearGradient>
 
-    <!-- Soft diffused candy-glass sheen over upper-left of disc -->
-    <radialGradient id="glossGrad" cx="34%" cy="28%" r="54%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.40"/>
-      <stop offset="55%" stop-color="#ffffff" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-
-    <!-- Play button crisp highlight -->
-    <linearGradient id="playGrad" x1="59" y1="53" x2="74" y2="75" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#ccfbf1"/>
-    </linearGradient>
-
-    <!-- Drop shadow filters -->
-    <filter id="softShadow" x="-15%" y="-15%" width="130%" height="135%">
-      <feDropShadow dx="0" dy="3.5" stdDeviation="3.5" flood-color="#022c22" flood-opacity="0.42"/>
-    </filter>
-    <filter id="hubShadow" x="-25%" y="-25%" width="150%" height="150%">
-      <feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#022c22" flood-opacity="0.38"/>
+    <!-- Soft drop shadow matching Nettle so both icons float cleanly together -->
+    <filter id="dropShadow" x="-18%" y="-14%" width="136%" height="136%">
+      <feDropShadow dx="0" dy="3.5" stdDeviation="3.2" flood-color="#022c22" flood-opacity="0.34"/>
     </filter>
 
-    <!-- Clip inside the squircle tile -->
-    <clipPath id="tileClip">
-      <rect x="10" y="10" width="108" height="108" rx="26"/>
-    </clipPath>
+    <!-- Gentle overlap shadow cast by front leaf onto companion leaf -->
+    <filter id="overlapShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-2.5" dy="2" stdDeviation="2.6" flood-color="#022c22" flood-opacity="0.32"/>
+    </filter>
 
-    <!-- Clip swirl arms cleanly inside the disc -->
-    <clipPath id="discClip">
-      <circle cx="64" cy="64" r="39.5"/>
-    </clipPath>
+    <!-- Classic plump ovate peppermint leaf silhouette (smooth curved margins, gentle pointed tip) -->
+    <path
+      id="mintLeaf"
+      d="M 64 12
+         C 52.5 22.5, 35 38.5, 35 58.5
+         C 35 76, 47 88, 64 92
+         C 81 88, 93 76, 93 58.5
+         C 93 38.5, 75.5 22.5, 64 12 Z"
+    />
 
-    <!-- Single curved peppermint pinwheel arm -->
-    <path id="swirlArm" d="M 64 64 C 73 50, 91 45, 105 61 A 41 41 0 0 1 101 83 C 89 67, 74 63, 64 64 Z"/>
+    <clipPath id="mintClip">
+      <use href="#mintLeaf"/>
+    </clipPath>
   </defs>
 
-  <!-- Subtle outer bottom depth shadow -->
-  <rect x="11" y="13" width="106" height="106" rx="26" fill="#022c22" opacity="0.28"/>
+  <g filter="url(#dropShadow)" transform="translate(2, -1)">
+    <!-- Graceful curved shared stem -->
+    <path
+      d="M 60 88 Q 56 102.5 47.5 114"
+      stroke="url(#stemGrad)"
+      stroke-width="5.2"
+      stroke-linecap="round"
+      fill="none"
+    />
 
-  <!-- Main COSMIC squircle tile -->
-  <g clip-path="url(#tileClip)">
-    <rect x="10" y="10" width="108" height="108" rx="26" fill="url(#bgGrad)"/>
-    <rect x="10" y="10" width="108" height="108" rx="26" fill="url(#tileGlow)"/>
+    <!-- Smaller companion peppermint leaf tucked to the left -->
+    <g transform="translate(55, 92) rotate(-37) scale(0.75) translate(-64, -92)">
+      <use href="#mintLeaf" fill="url(#backLeafGrad)"/>
+      <g clip-path="url(#mintClip)">
+        <rect x="64" y="8" width="38" height="90" fill="url(#leafShade)"/>
+        <!-- Midrib -->
+        <path
+          d="M 64 25 L 64 86.5"
+          stroke="#ccfbf1"
+          stroke-opacity="0.68"
+          stroke-width="3.0"
+          stroke-linecap="round"
+          fill="none"
+        />
+        <!-- Curved lateral veins (ending cleanly with rounded caps inside margin) -->
+        <g stroke="#ccfbf1" stroke-opacity="0.46" stroke-width="2.2" stroke-linecap="round" fill="none">
+          <path d="M 64 46 Q 56 43 50.5 38"/>
+          <path d="M 64 46 Q 72 43 77.5 38"/>
+          <path d="M 64 66 Q 53 63 45.5 56.5"/>
+          <path d="M 64 66 Q 75 63 82.5 56.5"/>
+        </g>
+      </g>
+      <use
+        href="#mintLeaf"
+        fill="none"
+        stroke="#064e3b"
+        stroke-opacity="0.28"
+        stroke-width="1.6"
+        stroke-linejoin="round"
+      />
+    </g>
+
+    <!-- Primary front peppermint leaf angled gracefully to the upper-right -->
+    <g filter="url(#overlapShadow)" transform="translate(60, 93) rotate(22) scale(1.06) translate(-64, -92)">
+      <use href="#mintLeaf" fill="url(#frontLeafGrad)"/>
+      <g clip-path="url(#mintClip)">
+        <rect x="64" y="8" width="38" height="90" fill="url(#leafShade)"/>
+        <!-- Midrib -->
+        <path
+          d="M 64 22.5 L 64 86.5"
+          stroke="#ccfbf1"
+          stroke-opacity="0.74"
+          stroke-width="2.6"
+          stroke-linecap="round"
+          fill="none"
+        />
+        <!-- Curved lateral veins (ending cleanly with rounded caps inside margin) -->
+        <g stroke="#ccfbf1" stroke-opacity="0.52" stroke-width="2.0" stroke-linecap="round" fill="none">
+          <path d="M 64 41 Q 57 38.5 52.5 34"/>
+          <path d="M 64 41 Q 71 38.5 75.5 34"/>
+          <path d="M 64 58 Q 53.5 55 46 49"/>
+          <path d="M 64 58 Q 74.5 55 82 49"/>
+          <path d="M 64 74 Q 54 71.5 46.5 66"/>
+          <path d="M 64 74 Q 74 71.5 81.5 66"/>
+        </g>
+      </g>
+      <use
+        href="#mintLeaf"
+        fill="none"
+        stroke="#064e3b"
+        stroke-opacity="0.26"
+        stroke-width="1.35"
+        stroke-linejoin="round"
+      />
+    </g>
   </g>
-  <rect x="10.75" y="10.75" width="106.5" height="106.5" rx="25.25" fill="none" stroke="url(#rimLight)" stroke-width="1.5"/>
-
-  <!-- Peppermint vinyl disc -->
-  <g filter="url(#softShadow)">
-    <circle cx="64" cy="64" r="40" fill="url(#discBase)"/>
-  </g>
-
-  <!-- Six curved peppermint swirl arms -->
-  <g clip-path="url(#discClip)">
-    <use href="#swirlArm" fill="url(#swirlGrad)"/>
-    <use href="#swirlArm" fill="url(#swirlGrad)" transform="rotate(60 64 64)"/>
-    <use href="#swirlArm" fill="url(#swirlGrad)" transform="rotate(120 64 64)"/>
-    <use href="#swirlArm" fill="url(#swirlGrad)" transform="rotate(180 64 64)"/>
-    <use href="#swirlArm" fill="url(#swirlGrad)" transform="rotate(240 64 64)"/>
-    <use href="#swirlArm" fill="url(#swirlGrad)" transform="rotate(300 64 64)"/>
-
-    <!-- Subtle vinyl record grooves -->
-    <circle cx="64" cy="64" r="35.5" fill="none" stroke="#064e3b" stroke-opacity="0.10" stroke-width="0.9"/>
-    <circle cx="64" cy="64" r="31" fill="none" stroke="#064e3b" stroke-opacity="0.08" stroke-width="0.8"/>
-    <circle cx="64" cy="64" r="26.5" fill="none" stroke="#064e3b" stroke-opacity="0.08" stroke-width="0.8"/>
-
-    <!-- Soft diffused gloss over upper-left of disc -->
-    <circle cx="64" cy="64" r="39.5" fill="url(#glossGrad)"/>
-  </g>
-
-  <!-- Crisp outer disc rim -->
-  <circle cx="64" cy="64" r="39.5" fill="none" stroke="#ffffff" stroke-opacity="0.72" stroke-width="1.4"/>
-
-  <!-- Center vinyl hub & play emblem -->
-  <g filter="url(#hubShadow)">
-    <circle cx="64" cy="64" r="18.5" fill="#ecfdf5"/>
-    <circle cx="64" cy="64" r="16.2" fill="url(#hubGrad)"/>
-    <circle cx="64" cy="64" r="15.5" fill="none" stroke="#5eead4" stroke-opacity="0.35" stroke-width="1"/>
-  </g>
-
-  <!-- Rounded Play triangle (optically centered) -->
-  <path
-    d="M 61.1 55.8 C 59.8 55.0 58.7 55.7 58.7 57.2 L 58.7 70.8 C 58.7 72.3 59.8 73.0 61.1 72.2 L 72.9 65.4 C 74.2 64.6 74.2 63.4 72.9 62.6 Z"
-    fill="url(#playGrad)"
-  />
 </svg>
