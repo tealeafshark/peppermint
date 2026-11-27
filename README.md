@@ -4,9 +4,25 @@ A fast, native local music player for the **COSMIC Desktop**, built in Rust with
 
 ![Peppermint Music Player on COSMIC Desktop](screenshots/preview.png)
 
+## Install
+
+Download the latest `.flatpak` bundle from [**GitHub Releases**](https://github.com/tealeafshark/peppermint/releases/latest) and install it:
+
+```bash
+flatpak install --user peppermint-0.3.1-x86_64.flatpak
+```
+
+Then launch **Peppermint** from the COSMIC app launcher, or run:
+
+```bash
+flatpak run io.github.tealeafshark.Peppermint
+```
+
+*(If Flathub isn't already configured for your user, add it once with `flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo` so the Freedesktop `26.08` runtime installs automatically.)*
+
 ## Features
 
-- **Gapless Playback & Crossfade:** Pre-decodes the upcoming track on the audio thread for seamless 0 ms transitions on live albums and continuous mixes, with optional equal-power crossfade, ReplayGain normalization, and soft pause/resume fading.
+- **Gapless Playback & Crossfade:** Pre-decodes the upcoming track on the audio thread for seamless 0 ms transitions on live albums and continuous mixes, with optional equal-power crossfade, ReplayGain loudness normalization, and soft pause/resume fading.
 - **Settings Window (`Ctrl+,`):** Frosted pop-out Settings window with categorized tabs (**Audio & Playback**, **Appearance**, **Library & Playlists**, and **Lyrics & Shortcuts**) — tune gapless/crossfade, ReplayGain, frosted glass opacity, visualizer FPS, playlist density, duplicate handling, M3U path format, and lyrics display live.
 - **Multi-Tab Resizable Playlists:** Always-visible playlist tab strip (`+` new tab, inline rename, close tab, `Ctrl+1..9` to switch tabs without interrupting playback), draggable sidebar splitter up to 50% of window width, and uniform single-line track cards that smoothly scroll long titles on hover.
 - **Full Drag-and-Drop Control:** Drag tracks to reorder them with a COSMIC-accent drop indicator, nudge with `Alt+Up`/`Alt+Down`, or drag audio files and folders straight from **COSMIC Files** onto any playlist tab.
@@ -36,43 +52,32 @@ A fast, native local music player for the **COSMIC Desktop**, built in Rust with
 | `Ctrl+,` | Open Settings window |
 | `V` | Cycle background visualizer style |
 
-## Running
+## Building from Source
 
-```bash
-cargo run
-```
-
-For an optimized release build:
+### Cargo
 
 ```bash
 cargo run --release
 ```
 
-## Flatpak & COSMIC Store
+### Local Flatpak Build
 
-### 1. Build & Install Locally as a Flatpak
-
-Install `flatpak-builder` and the Freedesktop 26.08 SDK + Rust extension once:
+Install `flatpak-builder` and the Freedesktop `26.08` SDK + Rust extension once:
 
 ```bash
-sudo dnf install flatpak-builder
 flatpak install flathub \
   org.freedesktop.Platform//26.08 \
   org.freedesktop.Sdk//26.08 \
   org.freedesktop.Sdk.Extension.rust-stable//26.08
 ```
 
-Then build, install for your user, and export a shareable `flatpak/peppermint.flatpak` bundle:
+Then build and install for your user:
 
 ```bash
 ./flatpak/build-local.sh
 flatpak run io.github.tealeafshark.Peppermint
 ```
 
-### 2. Publishing to Flathub & COSMIC Store
+## License
 
-COSMIC Store automatically discovers and highlights native COSMIC apps from Flathub that include `<provides><id>com.system76.CosmicApplication</id></provides>` (already configured in `resources/app.metainfo.xml`).
-
-1. Ensure the latest release tag (e.g., `v0.3.1`) and commit SHA are pinned in `flatpak/io.github.tealeafshark.Peppermint.yml`.
-2. Regenerate `flatpak/cargo-sources.json` with `flatpak-cargo-generator.py` whenever `Cargo.lock` dependencies change (already up-to-date in `flatpak/cargo-sources.json`).
-3. Open a Pull Request to `flathub/flathub` targeting the `new-pr` branch with `io.github.tealeafshark.Peppermint.yml` and `cargo-sources.json`.
+Peppermint is free software licensed under the [GNU General Public License v3.0](LICENSE).
